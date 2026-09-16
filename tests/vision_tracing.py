@@ -3,13 +3,23 @@
 """Run with the replay Python: unittest discover -s tests -p 'vision_*.py'."""
 
 import unittest
+from types import SimpleNamespace
 
 from pinky_lane_driving.tracing import trace_polygon
 from pinky_lane_driving.calibration import Calibration
 from test_calibration import synthetic_config
+from pinky_lane_driving.vision import decode_image
 
 
 class TracingTest(unittest.TestCase):
+    def test_ros_rgb_stride_and_invalid_buffer(self):
+        message = SimpleNamespace(encoding='rgb8', width=1, height=2, step=4,
+                                  data=bytes([10, 20, 30, 99, 40, 50, 60, 99]))
+        self.assertEqual(decode_image(message).tolist(), [[[30, 20, 10]], [[60, 50, 40]]])
+        message.data = b''
+        with self.assertRaises(ValueError):
+            decode_image(message)
+
     def test_metric_overlay_roundtrip_with_distortion(self):
         config = synthetic_config()
         config['distortion'] = [.01, -.001, .0001, .0002, 0.]

@@ -15,25 +15,13 @@ import sys
 from dataclasses import asdict
 
 
-CLASSES = {0: 'crosswalk', 1: 'left line', 2: 'right line'}
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'pinky_lane_driving'))
-from pinky_lane_driving.perception import observe
-from pinky_lane_driving.tracing import trace_polygon
+from pinky_lane_driving.vision import CLASSES, observe_result, trace_observation, validate_model
 from pinky_lane_driving.calibration import Calibration
 from pinky_lane_driving.path import LanePath, PathSettings
 from pinky_lane_driving.tracking import LaneTracker
-
-
-def observe_result(result, capture_time_s):
-    """Adapt YOLO polygons without merging instances or fabricating calibration."""
-    ids = [int(i) for i in result.boxes.cls.tolist()]
-    scores = result.boxes.conf.tolist()
-    polygons = [] if result.masks is None else [p.tolist() for p in result.masks.xy]
-    height, width = result.orig_shape
-    return observe(capture_time_s, 'camera_optical_frame', (width, height),
-                   ids, scores, polygons)
 
 
 def frame_plan(fps, total, start, end, sample_fps):
@@ -47,12 +35,6 @@ def frame_plan(fps, total, start, end, sample_fps):
     if not frames:
         raise ValueError('Interval contains no frames')
     return frames, fps / stride
-
-
-def validate_model(task, names):
-    """Reject incompatible weights instead of silently misinterpreting classes."""
-    if task != 'segment' or names != CLASSES:
-        raise ValueError(f'Expected segment with {CLASSES}; got {task}: {names}')
 
 
 def sha256(path):
@@ -102,21 +84,15 @@ def replay_case(cv2, model, case, output, conf, imgsz, device, sample_fps, track
                 empty += not ids
                 row = {'source_frame': index, 'source_time_s': index / fps,
                        'inference_s': elapsed, 'class_ids': ids, 'confidence': scores}
-                row['observation'] = observe_result(result, index / fps)
+                row['observation'] = trace_observation(observe_result(result, index / fps))
                 canvas = result.plot(boxes=True, labels=True, conf=True)
                 for detection in row['observation']['detections']:
                     if detection['class_id'] == 0:
                         continue
-                    try:
-                        trace = trace_polygon(detection['polygon_px'], size)
-                        detection['boundary_px'] = trace
-                        detection['trace_status'] = 'pixel_only'
-                        for a, b in zip(trace, trace[1:]):
-                            cv2.line(canvas, tuple(map(round, a)), tuple(map(round, b)),
-                                     (0, 255, 255), 2)
-                    except ValueError as error:
-                        detection['trace_status'] = 'invalid'
-                        detection['trace_error'] = str(error)
+                    trace = detection.get('boundary_px', ())
+                    for a, b in zip(trace, trace[1:]):
+                        cv2.line(canvas, tuple(map(round, a)), tuple(map(round, b)),
+                                 (0, 255, 255), 2)
                 lane = (LanePath(reason='uncalibrated') if tracker is None else
                         tracker.update(row['observation'], now=index / fps))
                 row['lane_path'] = dict(asdict(lane), frame_id='base_footprint', units='m')

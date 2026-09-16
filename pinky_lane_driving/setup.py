@@ -10,5 +10,6 @@ setup(
     install_requires=['setuptools'], tests_require=['pytest'],
     maintainer='SeungHoon Jeong', maintainer_email='jsh0116@users.noreply.github.com',
     description='Calibrated lane algorithms and fail-safe ROS adapters', license='Apache-2.0',
-    entry_points={'console_scripts': ['lane_watchdog = pinky_lane_driving.ros_watchdog:main']},
+    entry_points={'console_scripts': ['lane_watchdog = pinky_lane_driving.ros_watchdog:main',
+                                      'lane_perception = pinky_lane_driving.ros_perception:main']},
 )

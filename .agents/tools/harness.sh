@@ -50,5 +50,11 @@ case "$mode" in
     ROS_DOMAIN_ID=177 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST \
       python3 -m unittest discover -s tests -p 'ros_*.py' -v
     ;;
+  ros-model)
+    if (( $# )); then echo 'ros-model takes no arguments' >&2; exit 2; fi
+    source /opt/ros/jazzy/setup.bash
+    ROS_DOMAIN_ID=177 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST \
+      "${REPLAY_PYTHON:-python3}" .agents/tools/ros_model_smoke.py
+    ;;
   *) echo 'Usage: .agents/tools/harness.sh [fast | vision | ros-smoke | ros PACKAGE... | replay --config FILE]' >&2; exit 2 ;;
 esac
