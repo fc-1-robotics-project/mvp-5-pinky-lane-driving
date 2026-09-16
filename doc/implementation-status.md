@@ -22,7 +22,15 @@ perception adapters, behavior/control, and robot-side watchdog.
   remaining source-age budget, strictly ordered sequences, invalid-input stop.
 - Planar laser-return transform and swept circumscribed-footprint collision checks.
   No-hit is not proof of unobserved free space; adapter coverage validation remains.
-- `.agents/tools/harness.sh fast`: 37 tests passed. RED and GREEN commits are
+- Metric boundary selection and normal-section center polylines reject wrong width,
+  near-field disconnection and ambiguity; synthetic 120-degree bend passes.
+  Single-boundary normal offsets require a bounded fallback age and speed cap.
+- Instance mask thinning/geodesic tracing runs in the existing replay environment.
+  45 actual frames produce 75 lane traces and 30 crosswalk instances in
+  `.agents/output/replay/run-u6vtafwn/`. One overlay sample was inspected, not a full
+  mask-quality evaluation; metric_valid remains false without measured calibration.
+- `.agents/tools/harness.sh fast`: 44 tests passed; `vision`: 3 tests passed.
+  RED and GREEN commits are
   separate for perception, replay adaptation, control, behavior, watchdog and scans.
 - Actual best (2).pt replay: 3 windows across both training recordings, 45 sampled
   frames and decoded output frames. `.agents/output/replay/run-nuaoy7fe/report.json`
@@ -45,9 +53,9 @@ user permits inclusion but duplication is unnecessary for these tests.
 
 - Measured camera intrinsics/distortion, floor correspondences and lane width;
   validate calibration resolution/pose/domain before metric video processing.
-- Current-lane association (not largest mask), boundary tracing, corresponding
-  cross-sections, normal-offset single-boundary fallback with time/speed bounds;
-  current-frame odometry transforms for temporal reuse.
+- Connect tested pixel tracing and calibrated projection to metric boundary
+  association, maintain fallback age/speed state across frames, and transform
+  temporal hints with current-frame odometry. Test S-curves and tracing edge cases.
 - Connect calibrated paths and target overlay to both videos; evaluate straight,
   S-turn, sharp turns, opposite-lane markings and missing boundaries.
 - Crosswalk path overlap and stable event identity/positive passage association;

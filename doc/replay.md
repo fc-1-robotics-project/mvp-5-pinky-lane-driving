@@ -12,6 +12,7 @@ OpenCV, PyTorch, Ultralytics가 설치된 Python을 지정한다.
 
 ```bash
 ./.agents/tools/harness.sh fast
+REPLAY_PYTHON=/home/seunghoon/dev_ws/ros/.venv_yolo/bin/python ./.agents/tools/harness.sh vision
 REPLAY_PYTHON=/home/seunghoon/dev_ws/ros/.venv_yolo/bin/python ./.agents/tools/harness.sh replay
 # 특정 구간만 확인
 REPLAY_PYTHON=/home/seunghoon/dev_ws/ros/.venv_yolo/bin/python ./.agents/tools/harness.sh replay --case first_crosswalk
@@ -29,6 +30,9 @@ sample_fps를 원본 FPS 이상으로 지정한다. 기본값 5fps는 빠른 육
 
 - `*.mp4`: segmentation 및 원본 영상 시각 overlay. 일반 영상 플레이어로 재생/탐색.
 - `*.jsonl`: 원본 프레임 번호, 시각, 클래스, confidence, 추론 소요 시간.
+- `observation`: 인스턴스별 polygon과 픽셀 경계 `boundary_px`. 노란 선은
+  마스크 skeleton 경계이며 차로 중심/미터 경로가 아니다. 추출 실패는
+  `trace_status=invalid`로 기록한다. 실제 보정 전 `metric_valid=false`다.
 - `report.json`: 모델/영상 SHA-256, 라이브러리 버전, 실행 설정, 검출 수, 결과 상태.
 
 `execution_passed`는 지정 프레임 추론과 결과 영상 디코딩의 성공이다.
