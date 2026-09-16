@@ -3,7 +3,7 @@
 ## Repository
 
 - Local checkout: `/home/seunghoon/ros/pinky-lane-driving`
-- Branch: `feat/lane-driving-tdd`
+- Branch: `chore/initial-setup`
 - origin: `git@github.com:jsh0116/pinky-lane-driving.git`
 - upstream: `https://github.com/pinklab-art/pinky_pro.git`
 - Imported main: `75f76e8b7cd971c32c07233f7accd418dab1d6b4`

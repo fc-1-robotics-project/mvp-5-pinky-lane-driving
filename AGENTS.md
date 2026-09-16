@@ -2,7 +2,7 @@
 
 - Scope: this repository, including imported Pinky packages.
 - `origin` is jsh0116/pinky-lane-driving; `upstream` is pinklab-art/pinky_pro.
-- Work on `feat/lane-driving-tdd`. Do not push without explicit user permission.
+- Initial setup branch: `chore/initial-setup`. Do not push without explicit user permission.
 - Preserve upstream history, LICENSE and unrelated user changes. Do not force-push.
 - Keep upstream packages at the repository root; add the lane ROS package beside them.
 - Read the real node/callback/topic/actuator flow before editing. Reuse existing code.
