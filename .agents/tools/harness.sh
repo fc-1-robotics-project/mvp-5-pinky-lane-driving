@@ -39,5 +39,9 @@ case "$mode" in
   replay)
     "${REPLAY_PYTHON:-python3}" .agents/tools/replay.py "$@"
     ;;
-  *) echo 'Usage: .agents/tools/harness.sh [fast | ros PACKAGE... | replay --config FILE]' >&2; exit 2 ;;
+  vision)
+    if (( $# )); then echo 'vision takes no arguments' >&2; exit 2; fi
+    "${REPLAY_PYTHON:-python3}" -m unittest discover -s tests -p 'vision_*.py' -v
+    ;;
+  *) echo 'Usage: .agents/tools/harness.sh [fast | vision | ros PACKAGE... | replay --config FILE]' >&2; exit 2 ;;
 esac

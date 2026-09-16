@@ -18,6 +18,7 @@ CLASSES = {0: 'crosswalk', 1: 'left line', 2: 'right line'}
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from pinky_lane_driving.perception import observe
+from pinky_lane_driving.tracing import trace_polygon
 
 
 def observe_result(result, capture_time_s):
@@ -97,8 +98,23 @@ def replay_case(cv2, model, case, output, conf, imgsz, device, sample_fps):
                 row = {'source_frame': index, 'source_time_s': index / fps,
                        'inference_s': elapsed, 'class_ids': ids, 'confidence': scores}
                 row['observation'] = observe_result(result, index / fps)
-                log.write(json.dumps(row, allow_nan=False) + '\n')
                 canvas = result.plot(boxes=True, labels=True, conf=True)
+                for detection in row['observation']['detections']:
+                    if detection['class_id'] == 0:
+                        continue
+                    try:
+                        trace = trace_polygon(detection['polygon_px'], size)
+                        detection['boundary_px'] = trace
+                        detection['trace_status'] = 'pixel_only'
+                        for a, b in zip(trace, trace[1:]):
+                            cv2.line(canvas, tuple(map(round, a)), tuple(map(round, b)),
+                                     (0, 255, 255), 2)
+                    except ValueError as error:
+                        detection['trace_status'] = 'invalid'
+                        detection['trace_error'] = str(error)
+                log.write(json.dumps(row, allow_nan=False) + '\n')
+                cv2.putText(canvas, 'yellow: pixel boundary | metric path: UNCALIBRATED',
+                            (8, 18), cv2.FONT_HERSHEY_SIMPLEX, .4, (0, 255, 255), 1)
                 cv2.putText(canvas, f"{case['name']} | {index / fps:.2f}s | perception only",
                             (8, size[1] - 12), cv2.FONT_HERSHEY_SIMPLEX, .45,
                             (255, 255, 255), 1)
