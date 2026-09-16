@@ -43,6 +43,10 @@ perception adapters, behavior/control, and robot-side watchdog.
   crosswalk events, behavior and final speed proposals. Unverified scan coverage,
   stale inputs and pose failures stop; one-sided speed cap survives arbitration.
 - `.agents/tools/harness.sh fast`: 63 tests passed; `vision`: 4 tests passed.
+- Independent ROS watchdog adapter: `ros-smoke` 2 localhost graph tests pass,
+  including publisher silence -> zero on dry-run topic, stale/malformed rejection.
+- Standard ament_python package builds; colcon test's core-suite bridge passes.
+  `ros2 pkg executables pinky_lane_driving` discovers `lane_watchdog`.
   RED and GREEN commits are
   separate for perception, replay adaptation, control, behavior, watchdog and scans.
 - Actual best (2).pt replay: 3 windows across both training recordings, 45 sampled
