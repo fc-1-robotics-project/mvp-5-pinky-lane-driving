@@ -18,6 +18,7 @@ from dataclasses import asdict
 CLASSES = {0: 'crosswalk', 1: 'left line', 2: 'right line'}
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / 'pinky_lane_driving'))
 from pinky_lane_driving.perception import observe
 from pinky_lane_driving.tracing import trace_polygon
 from pinky_lane_driving.calibration import Calibration

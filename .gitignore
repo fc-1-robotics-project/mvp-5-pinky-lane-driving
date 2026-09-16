@@ -56,6 +56,7 @@ CATKIN_IGNORE
 install/
 log/
 __pycache__/
+*.egg-info/
 .pytest_cache/
 .venv*/
 *.pt

@@ -4,6 +4,7 @@
 set -eo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$root"
+export PYTHONPATH="$root/pinky_lane_driving${PYTHONPATH:+:$PYTHONPATH}"
 mode="${1:-fast}"
 if (( $# )); then shift; fi
 case "$mode" in
@@ -43,5 +44,11 @@ case "$mode" in
     if (( $# )); then echo 'vision takes no arguments' >&2; exit 2; fi
     "${REPLAY_PYTHON:-python3}" -m unittest discover -s tests -p 'vision_*.py' -v
     ;;
-  *) echo 'Usage: .agents/tools/harness.sh [fast | vision | ros PACKAGE... | replay --config FILE]' >&2; exit 2 ;;
+  ros-smoke)
+    if (( $# )); then echo 'ros-smoke takes no arguments' >&2; exit 2; fi
+    source /opt/ros/jazzy/setup.bash
+    ROS_DOMAIN_ID=177 ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST \
+      python3 -m unittest discover -s tests -p 'ros_*.py' -v
+    ;;
+  *) echo 'Usage: .agents/tools/harness.sh [fast | vision | ros-smoke | ros PACKAGE... | replay --config FILE]' >&2; exit 2 ;;
 esac
