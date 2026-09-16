@@ -49,3 +49,18 @@ qtcreator-*
 
 # Catkin custom files
 CATKIN_IGNORE
+
+# Lane project local artifacts (keep upstream exclusions above).
+.harness/
+install/
+log/
+__pycache__/
+.pytest_cache/
+.venv*/
+*.pt
+*.onnx
+*.mp4
+*.h264
+*.zip
+.env
+.env.*
