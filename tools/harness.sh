@@ -36,5 +36,8 @@ case "$mode" in
     if (( test_status != 0 )); then exit "$test_status"; fi
     exit "$result_status"
     ;;
-  *) echo 'Usage: tools/harness.sh [fast | ros PACKAGE...]' >&2; exit 2 ;;
+  replay)
+    "${REPLAY_PYTHON:-python3}" tools/replay.py "$@"
+    ;;
+  *) echo 'Usage: tools/harness.sh [fast | ros PACKAGE... | replay --config FILE]' >&2; exit 2 ;;
 esac
