@@ -1,0 +1,26 @@
+# Pinky Lane Driving engineering rules
+
+- Scope: this repository, including imported Pinky packages.
+- `origin` is jsh0116/pinky-lane-driving; `upstream` is pinklab-art/pinky_pro.
+- Initial setup branch: `chore/initial-setup`. Do not push without explicit user permission.
+- Preserve upstream history, LICENSE and unrelated user changes. Do not force-push.
+- Keep upstream packages at the repository root; add the lane ROS package beside them.
+- Read the real node/callback/topic/actuator flow before editing. Reuse existing code.
+- Keep geometry, control and state transitions independent of ROS and inference.
+- TDD: failing test and observed failure first, minimal implementation next, then refactor.
+- Separate RED and GREEN commits when requested. Mark RED commits explicitly.
+- Run `./tools/harness.sh fast` for new logic; record command, result and limitations.
+- Use `./tools/harness.sh ros PACKAGE...` for affected ROS packages in a clean terminal.
+- Never treat unit tests, ROS builds, simulation and physical tests as equivalent.
+- Do not run hardware bringup, publish motor commands or SSH-deploy automatically.
+- Default future launch files to disarmed/dry-run; only one final motor command owner.
+- Invalid/stale sensor inputs, cancellation and communication loss must stop motion.
+- Preserve capture timestamps; define clock domains, QoS and freshness at interfaces.
+- Ground geometry: base_footprint, x forward/y left/z up; metres, radians, seconds.
+- Keep pixel coordinates distinct from metric coordinates. Uncalibrated input cannot arm.
+- Explicitly validate bounds on speed, acceleration, timeout and calibration parameters.
+- Inject time into state-machine tests; no sleeping to test waits or timeouts.
+- Do not commit models, recordings, datasets, credentials or generated build artifacts.
+- Use standard library and installed dependencies first; avoid speculative abstractions.
+- Run shell commands through rtk when available. Use apply_patch for authored edits.
+- Korean polish applies only to explicit writing/polishing requests.
