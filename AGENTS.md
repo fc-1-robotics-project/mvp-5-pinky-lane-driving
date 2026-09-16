@@ -1,26 +1,59 @@
-# Pinky Lane Driving engineering rules
+# Repository Guidelines
 
-- Scope: this repository, including imported Pinky packages.
-- `origin` is jsh0116/pinky-lane-driving; `upstream` is pinklab-art/pinky_pro.
-- Initial setup branch: `chore/initial-setup`. Do not push without explicit user permission.
-- Preserve upstream history, LICENSE and unrelated user changes. Do not force-push.
-- Keep upstream packages at the repository root; add the lane ROS package beside them.
-- Read the real node/callback/topic/actuator flow before editing. Reuse existing code.
-- Keep geometry, control and state transitions independent of ROS and inference.
-- TDD: failing test and observed failure first, minimal implementation next, then refactor.
-- Separate RED and GREEN commits when requested. Mark RED commits explicitly.
-- Run `./tools/harness.sh fast` for new logic; record command, result and limitations.
-- Use `./tools/harness.sh ros PACKAGE...` for affected ROS packages in a clean terminal.
-- Never treat unit tests, ROS builds, simulation and physical tests as equivalent.
-- Do not run hardware bringup, publish motor commands or SSH-deploy automatically.
-- Default future launch files to disarmed/dry-run; only one final motor command owner.
-- Invalid/stale sensor inputs, cancellation and communication loss must stop motion.
-- Preserve capture timestamps; define clock domains, QoS and freshness at interfaces.
-- Ground geometry: base_footprint, x forward/y left/z up; metres, radians, seconds.
-- Keep pixel coordinates distinct from metric coordinates. Uncalibrated input cannot arm.
-- Explicitly validate bounds on speed, acceleration, timeout and calibration parameters.
-- Inject time into state-machine tests; no sleeping to test waits or timeouts.
-- Do not commit models, recordings, datasets, credentials or generated build artifacts.
-- Use standard library and installed dependencies first; avoid speculative abstractions.
-- Run shell commands through rtk when available. Use apply_patch for authored edits.
-- Korean polish applies only to explicit writing/polishing requests.
+## Project Structure
+
+This repository is a ROS 2 Jazzy workspace for Pinky Pro and lane-driving
+experiments. Keep ROS packages at the repository root:
+
+- `pinky_bringup/`, `pinky_description/`, `pinky_gz_sim/`: robot bringup,
+  URDF/meshes, and Gazebo simulation.
+- `pinky_navigation/`: Nav2, SLAM, maps, parameters, RViz, and web launch files.
+- `pinky_interfaces/`, `pinky_imu_bno055/`, `pinky_sensor_adc/`,
+  `pinky_led/`, `pinky_emotion/`, `pinky_lamp_control/`: interfaces and
+  hardware-facing nodes.
+- `tests/`: hardware-free Python tests; `tools/`: repository validation scripts.
+- `doc/`, `README.md`, and `PROJECT.md`: user documentation and lane-driving scope.
+
+## Build, Test, and Development
+
+Run the fast, hardware-free checks before every change:
+
+```bash
+./tools/harness.sh fast
+```
+
+For affected ROS packages, use a clean terminal with ROS 2 Jazzy available:
+
+```bash
+./tools/harness.sh ros pinky_description
+```
+
+Replace the package name with each affected package. This builds and tests in
+`.harness/` without launching nodes, moving motors, or deploying remotely.
+Use `bash -n tools/harness.sh` when changing the shell harness.
+
+For perception replay, configure ignored `replay.local.json` from
+`replay.example.json`, then run `./tools/harness.sh replay`. Set `REPLAY_PYTHON`
+to a Python with OpenCV, PyTorch and Ultralytics installed. See `doc/replay.md`.
+Replay success verifies execution and encoded output, not detection accuracy or driving.
+
+## Coding Style and Safety
+
+Use standard library and existing project patterns before adding dependencies.
+Use four-space Python indentation, conventional C++ formatting, and descriptive
+`snake_case` Python names. Preserve metres, radians, seconds, and the ROS frame
+convention `x` forward, `y` left, `z` up. Keep pixel and metric coordinates
+separate, validate parameter bounds, and preserve timestamps and QoS semantics.
+
+Never commit models, recordings, datasets, credentials, or generated build
+artifacts. Do not run hardware bringup, publish motor commands, SSH-deploy, or
+force-push without explicit approval. Unit tests, ROS builds, simulation, and
+physical tests are separate evidence.
+
+## Testing and Pull Requests
+
+Name Python tests `test_*.py` and keep logic hardware-free where possible.
+Tests must fail on errors, import failures, and empty discovery. Pull requests
+should explain the change, list commands and results, link the relevant issue,
+and call out unverified simulation or hardware behavior. Use concise imperative
+commit subjects such as `feat: add lane center estimator` or `test: cover stop timeout`.
