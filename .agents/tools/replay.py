@@ -11,10 +11,23 @@ import math
 from pathlib import Path
 import tempfile
 import time
+import sys
 
 
 CLASSES = {0: 'crosswalk', 1: 'left line', 2: 'right line'}
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+from pinky_lane_driving.perception import observe
+
+
+def observe_result(result, capture_time_s):
+    """Adapt YOLO polygons without merging instances or fabricating calibration."""
+    ids = [int(i) for i in result.boxes.cls.tolist()]
+    scores = result.boxes.conf.tolist()
+    polygons = [] if result.masks is None else [p.tolist() for p in result.masks.xy]
+    height, width = result.orig_shape
+    return observe(capture_time_s, 'camera_optical_frame', (width, height),
+                   ids, scores, polygons)
 
 
 def frame_plan(fps, total, start, end, sample_fps):
@@ -83,6 +96,7 @@ def replay_case(cv2, model, case, output, conf, imgsz, device, sample_fps):
                 empty += not ids
                 row = {'source_frame': index, 'source_time_s': index / fps,
                        'inference_s': elapsed, 'class_ids': ids, 'confidence': scores}
+                row['observation'] = observe_result(result, index / fps)
                 log.write(json.dumps(row, allow_nan=False) + '\n')
                 canvas = result.plot(boxes=True, labels=True, conf=True)
                 cv2.putText(canvas, f"{case['name']} | {index / fps:.2f}s | perception only",
