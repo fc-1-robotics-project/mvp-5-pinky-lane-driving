@@ -81,3 +81,23 @@ class Calibration:
         if any(not x0 <= u <= x1 or not y0 <= v <= y1 for u, v in points):
             raise ValueError('Pixels are outside the measured calibration domain')
         return project_ground(points, self.homography, rectified=True)
+
+    def image_points(self, ground_points):
+        """Project metric overlay back into the ORIGINAL distorted camera image."""
+        import cv2
+        import numpy as np
+
+        points = np.asarray(ground_points, dtype=float)
+        if points.ndim != 2 or points.shape[1] != 2 or not np.isfinite(points).all():
+            raise ValueError('Metric overlay needs finite 2D points')
+        inverse = np.linalg.inv(np.asarray(self.homography))
+        homogeneous = np.column_stack((points, np.ones(len(points)))) @ inverse.T
+        if np.any(np.abs(homogeneous[:, 2]) < 1e-9):
+            raise ValueError('Overlay intersects projective horizon')
+        pixels = homogeneous[:, :2] / homogeneous[:, 2:]
+        rays = np.column_stack((pixels, np.ones(len(pixels)))) @ np.linalg.inv(self.matrix).T
+        image, _ = cv2.projectPoints(rays, np.zeros(3), np.zeros(3),
+                                    np.asarray(self.matrix), np.asarray(self.distortion))
+        if not np.isfinite(image).all():
+            raise ValueError('Nonfinite overlay')
+        return tuple(tuple(map(float, p)) for p in image.reshape(-1, 2))

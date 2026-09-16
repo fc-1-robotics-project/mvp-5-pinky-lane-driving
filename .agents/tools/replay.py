@@ -12,6 +12,7 @@ from pathlib import Path
 import tempfile
 import time
 import sys
+from dataclasses import asdict
 
 
 CLASSES = {0: 'crosswalk', 1: 'left line', 2: 'right line'}
@@ -19,6 +20,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from pinky_lane_driving.perception import observe
 from pinky_lane_driving.tracing import trace_polygon
+from pinky_lane_driving.calibration import Calibration
+from pinky_lane_driving.path import LanePath, PathSettings
+from pinky_lane_driving.tracking import LaneTracker
 
 
 def observe_result(result, capture_time_s):
@@ -56,7 +60,7 @@ def sha256(path):
         return hashlib.file_digest(stream, 'sha256').hexdigest()
 
 
-def replay_case(cv2, model, case, output, conf, imgsz, device, sample_fps):
+def replay_case(cv2, model, case, output, conf, imgsz, device, sample_fps, tracker=None):
     """Produce one annotated clip and machine-readable frame observations."""
     source = Path(case['video'])
     cap = cv2.VideoCapture(str(source))
@@ -112,8 +116,16 @@ def replay_case(cv2, model, case, output, conf, imgsz, device, sample_fps):
                     except ValueError as error:
                         detection['trace_status'] = 'invalid'
                         detection['trace_error'] = str(error)
+                lane = (LanePath(reason='uncalibrated') if tracker is None else
+                        tracker.update(row['observation'], now=index / fps))
+                row['lane_path'] = dict(asdict(lane), frame_id='base_footprint', units='m')
+                if lane.valid:
+                    overlay = tracker.calibration.image_points(lane.points)
+                    for a, b in zip(overlay, overlay[1:]):
+                        cv2.line(canvas, tuple(map(round, a)), tuple(map(round, b)),
+                                 (0, 255, 0), 2)
                 log.write(json.dumps(row, allow_nan=False) + '\n')
-                cv2.putText(canvas, 'yellow: pixel boundary | metric path: UNCALIBRATED',
+                cv2.putText(canvas, f'yellow: boundary | green: metric path | {lane.reason}',
                             (8, 18), cv2.FONT_HERSHEY_SIMPLEX, .4, (0, 255, 255), 1)
                 cv2.putText(canvas, f"{case['name']} | {index / fps:.2f}s | perception only",
                             (8, size[1] - 12), cv2.FONT_HERSHEY_SIMPLEX, .45,
@@ -166,6 +178,12 @@ def main():
         return path
 
     weights = local_file(config['model'])
+    calibration = None
+    calibration_path = None
+    if config.get('calibration_file'):
+        calibration_path = local_file(config['calibration_file'])
+        calibration = Calibration(json.loads(calibration_path.read_text()))
+        path_settings = PathSettings(**config['path_settings'])
     cases = config['cases']
     names = [c['name'] for c in cases]
     if (not cases or len(set(names)) != len(names)
@@ -191,14 +209,21 @@ def main():
     report = {'status': 'running', 'model': str(weights), 'model_sha256': sha256(weights),
               'classes': CLASSES, 'conf': conf, 'imgsz': imgsz, 'sample_fps': sample_fps,
               'device': config.get('device', 'cpu'),
+              'calibration_sha256': sha256(calibration_path) if calibration_path else None,
+              'path_settings': config.get('path_settings') if calibration else None,
+              'mounting_id': config.get('mounting_id') if calibration else None,
               'versions': {'opencv': cv2.__version__, 'torch': torch.__version__,
                            'ultralytics': ultralytics.__version__}, 'cases': [],
               'scope': 'Perception replay only; no ground-truth accuracy or driving validation'}
     print(f'Output: {output}', flush=True)
     try:
         for case in cases:
+            tracker = (None if calibration is None else
+                       LaneTracker(calibration, path_settings,
+                                   mounting_id=config['mounting_id'],
+                                   timeout=config['capture_timeout_s']))
             result = replay_case(cv2, model, case, output, conf, imgsz,
-                                 report['device'], sample_fps)
+                                 report['device'], sample_fps, tracker)
             report['cases'].append(result)
             print(f"{case['name']}: {result['sampled_frames']} frames saved", flush=True)
         report['status'] = 'execution_passed'
