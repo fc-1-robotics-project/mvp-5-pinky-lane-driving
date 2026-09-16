@@ -29,7 +29,14 @@ perception adapters, behavior/control, and robot-side watchdog.
   45 actual frames produce 75 lane traces and 30 crosswalk instances in
   `.agents/output/replay/run-u6vtafwn/`. One overlay sample was inspected, not a full
   mask-quality evaluation; metric_valid remains false without measured calibration.
-- `.agents/tools/harness.sh fast`: 44 tests passed; `vision`: 3 tests passed.
+- Calibration configuration checks camera resolution/frame/mount identity, measured
+  ROI, intrinsic/distortion matrix and lane width; projection rectifies before H.
+- LaneTracker integrates traces -> metric boundaries -> selected path. One-sided
+  timeout starts at last paired observation, never refreshes on one-sided frames.
+  Optional capture-time odometry transforms continuity hints; stale input fails.
+- Replay optionally accepts real calibration and overlays green metric paths;
+  actual local inputs remain uncalibrated. Synthetic distortion roundtrip tested.
+- `.agents/tools/harness.sh fast`: 53 tests passed; `vision`: 4 tests passed.
   RED and GREEN commits are
   separate for perception, replay adaptation, control, behavior, watchdog and scans.
 - Actual best (2).pt replay: 3 windows across both training recordings, 45 sampled
@@ -53,9 +60,8 @@ user permits inclusion but duplication is unnecessary for these tests.
 
 - Measured camera intrinsics/distortion, floor correspondences and lane width;
   validate calibration resolution/pose/domain before metric video processing.
-- Connect tested pixel tracing and calibrated projection to metric boundary
-  association, maintain fallback age/speed state across frames, and transform
-  temporal hints with current-frame odometry. Test S-curves and tracing edge cases.
+- Test S-curves and tracing edge cases; wire capture-time and timer-time odometry
+  into live control and enforce one-sided speed cap in final proposals.
 - Connect calibrated paths and target overlay to both videos; evaluate straight,
   S-turn, sharp turns, opposite-lane markings and missing boundaries.
 - Crosswalk path overlap and stable event identity/positive passage association;
