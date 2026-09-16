@@ -42,11 +42,16 @@ perception adapters, behavior/control, and robot-side watchdog.
 - DriveCore connects calibrated observations, capture/current frame transforms,
   crosswalk events, behavior and final speed proposals. Unverified scan coverage,
   stale inputs and pose failures stop; one-sided speed cap survives arbitration.
-- `.agents/tools/harness.sh fast`: 63 tests passed; `vision`: 4 tests passed.
+- `.agents/tools/harness.sh fast`: 63 tests passed; `vision`: 5 tests passed.
 - Independent ROS watchdog adapter: `ros-smoke` 2 localhost graph tests pass,
   including publisher silence -> zero on dry-run topic, stale/malformed rejection.
 - Standard ament_python package builds; colcon test's core-suite bridge passes.
   `ros2 pkg executables pinky_lane_driving` discovers `lane_watchdog`.
+- Latest-frame ROS perception adapter shares observation/tracing code with replay;
+  ROS graph tests now total 4 including queue replacement and slow-result discard.
+  Actual best (2) with one frame from EACH video passes ROS Image -> observation
+  transport; timestamps preserved. Offline warmup allowance is 5 seconds, not
+  live acceptance (first sample 2.09 s, second .14 s). See `doc/ros-validation.md`.
   RED and GREEN commits are
   separate for perception, replay adaptation, control, behavior, watchdog and scans.
 - Actual best (2).pt replay: 3 windows across both training recordings, 45 sampled
