@@ -20,14 +20,14 @@ from tf2_ros import StaticTransformBroadcaster
 from pinky_lane_driving.ros_control import ControlNode
 from pinky_lane_driving.ros_watchdog import WatchdogNode
 from test_calibration import synthetic_config
-from test_runtime import RuntimeTest
+import test_runtime
 from test_tracking import observation
 
 
 class RosControlTest(unittest.TestCase):
     def setUp(self):
         rclpy.init()
-        helper = RuntimeTest()
+        helper = test_runtime.RuntimeTest()
         helper.setUp()
         config = dict(calibration=synthetic_config(), mounting_id='synthetic_fixture',
                       path=asdict(helper.core.tracker.settings), control=asdict(helper.core.limits),
