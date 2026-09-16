@@ -15,8 +15,15 @@ perception adapters, behavior/control, and robot-side watchdog.
 - Pure Pursuit proposals: polyline arc lookahead, signed curvature, speed/angular/
   lateral-acceleration limits, acceleration ramp, visible-path braking bound,
   and zero output on invalid/unmeasured/stale input. No ROS command publication.
-- `.agents/tools/harness.sh fast`: 20 tests passed. RED and GREEN commits are
-  separate for perception, replay adaptation, and control.
+- Nonblocking crosswalk state and final proposal arbitration: measured stop before
+  WAIT, repeated-event latch through PASS, explicit passage evidence, priority of
+  emergency/sensor failure/obstacles, stable-clear hold before restart.
+- Robot-local watchdog core: disabled by default, receiver-monotonic expiry,
+  remaining source-age budget, strictly ordered sequences, invalid-input stop.
+- Planar laser-return transform and swept circumscribed-footprint collision checks.
+  No-hit is not proof of unobserved free space; adapter coverage validation remains.
+- `.agents/tools/harness.sh fast`: 37 tests passed. RED and GREEN commits are
+  separate for perception, replay adaptation, control, behavior, watchdog and scans.
 - Actual best (2).pt replay: 3 windows across both training recordings, 45 sampled
   frames and decoded output frames. `.agents/output/replay/run-nuaoy7fe/report.json`
   records model/video hashes and versions; per-frame JSONL now contains polygons.
@@ -43,10 +50,12 @@ user permits inclusion but duplication is unnecessary for these tests.
   current-frame odometry transforms for temporal reuse.
 - Connect calibrated paths and target overlay to both videos; evaluate straight,
   S-turn, sharp turns, opposite-lane markings and missing boundaries.
-- Crosswalk path overlap, FOLLOW/APPROACH/WAIT/PASS latch and nonblocking timer.
-- LiDAR TF/footprint/path collision and stable-clear hold; stale scan is not clear.
-- Single command arbiter, fresh-input policy, independent robot watchdog and
-  dry-run ROS adapters; validate graph/QoS, process failure and simulation.
+- Crosswalk path overlap and stable event identity/positive passage association;
+  connect these to the tested FOLLOW/APPROACH/WAIT/PASS timer/latch core.
+- Validate actual LiDAR FOV/angular coverage, timestamped TF and footprint;
+  integrate return collision checks and tested stable-clear behavior hold.
+- Connect command arbiter and robot watchdog to dry-run ROS adapters and fresh
+  inputs; validate graph/QoS, process failure, downstream timeout and simulation.
 - Selected-package deployment/rollback instructions and explicitly authorized
   physical verification with fall protection and emergency stop.
 
