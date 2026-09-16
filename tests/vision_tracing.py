@@ -5,9 +5,22 @@
 import unittest
 
 from pinky_lane_driving.tracing import trace_polygon
+from pinky_lane_driving.calibration import Calibration
+from test_calibration import synthetic_config
 
 
 class TracingTest(unittest.TestCase):
+    def test_metric_overlay_roundtrip_with_distortion(self):
+        config = synthetic_config()
+        config['distortion'] = [.01, -.001, .0001, .0002, 0.]
+        cal = Calibration(config)
+        original = [(30., 70.), (70., 30.)]
+        projected = cal.project(original)
+        restored = cal.image_points(projected)
+        for a, b in zip(original, restored):
+            self.assertAlmostEqual(a[0], b[0], places=4)
+            self.assertAlmostEqual(a[1], b[1], places=4)
+
     def test_vertical_strip_stays_centered_and_near_to_far(self):
         points = trace_polygon([(40, 10), (60, 10), (60, 95), (40, 95)], (100, 100))
         self.assertGreater(len(points), 5)
