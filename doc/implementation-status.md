@@ -36,7 +36,13 @@ perception adapters, behavior/control, and robot-side watchdog.
   Optional capture-time odometry transforms continuity hints; stale input fails.
 - Replay optionally accepts real calibration and overlays green metric paths;
   actual local inputs remain uncalibrated. Synthetic distortion roundtrip tested.
-- `.agents/tools/harness.sh fast`: 53 tests passed; `vision`: 4 tests passed.
+- Crosswalk geometry associates path arc overlaps, groups nearby stripes, keeps
+  event identity in odom and requires positive travel plus behind-robot extent
+  before passage. Disappearance and pure rotation do not confirm passage.
+- DriveCore connects calibrated observations, capture/current frame transforms,
+  crosswalk events, behavior and final speed proposals. Unverified scan coverage,
+  stale inputs and pose failures stop; one-sided speed cap survives arbitration.
+- `.agents/tools/harness.sh fast`: 63 tests passed; `vision`: 4 tests passed.
   RED and GREEN commits are
   separate for perception, replay adaptation, control, behavior, watchdog and scans.
 - Actual best (2).pt replay: 3 windows across both training recordings, 45 sampled
@@ -64,8 +70,8 @@ user permits inclusion but duplication is unnecessary for these tests.
   into live control and enforce one-sided speed cap in final proposals.
 - Connect calibrated paths and target overlay to both videos; evaluate straight,
   S-turn, sharp turns, opposite-lane markings and missing boundaries.
-- Crosswalk path overlap and stable event identity/positive passage association;
-  connect these to the tested FOLLOW/APPROACH/WAIT/PASS timer/latch core.
+- Validate crosswalk event association with real calibrated observations and
+  continuous synchronized odometry; test noisy grouping and disconnected stripes.
 - Validate actual LiDAR FOV/angular coverage, timestamped TF and footprint;
   integrate return collision checks and tested stable-clear behavior hold.
 - Connect command arbiter and robot watchdog to dry-run ROS adapters and fresh
