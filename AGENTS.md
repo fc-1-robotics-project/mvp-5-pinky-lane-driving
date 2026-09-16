@@ -11,7 +11,9 @@ experiments. Keep ROS packages at the repository root:
 - `pinky_interfaces/`, `pinky_imu_bno055/`, `pinky_sensor_adc/`,
   `pinky_led/`, `pinky_emotion/`, `pinky_lamp_control/`: interfaces and
   hardware-facing nodes.
-- `tests/`: hardware-free Python tests; `tools/`: repository validation scripts.
+- `tests/`: hardware-free Python tests; `.agents/tools/`: repository validation scripts.
+- `.agents/`: shared harness code and configuration for coding agents.
+  `CLAUDE.md` imports this file so project guidance has a single source.
 - `doc/`, `README.md`, and `PROJECT.md`: user documentation and lane-driving scope.
 
 ## Build, Test, and Development
@@ -19,21 +21,21 @@ experiments. Keep ROS packages at the repository root:
 Run the fast, hardware-free checks before every change:
 
 ```bash
-./tools/harness.sh fast
+./.agents/tools/harness.sh fast
 ```
 
 For affected ROS packages, use a clean terminal with ROS 2 Jazzy available:
 
 ```bash
-./tools/harness.sh ros pinky_description
+./.agents/tools/harness.sh ros pinky_description
 ```
 
 Replace the package name with each affected package. This builds and tests in
-`.harness/` without launching nodes, moving motors, or deploying remotely.
-Use `bash -n tools/harness.sh` when changing the shell harness.
+`.agents/output/` without launching nodes, moving motors, or deploying remotely.
+Use `bash -n .agents/tools/harness.sh` when changing the shell harness.
 
-For perception replay, configure ignored `replay.local.json` from
-`replay.example.json`, then run `./tools/harness.sh replay`. Set `REPLAY_PYTHON`
+For perception replay, configure ignored `.agents/replay.local.json` from
+`.agents/replay.example.json`, then run `./.agents/tools/harness.sh replay`. Set `REPLAY_PYTHON`
 to a Python with OpenCV, PyTorch and Ultralytics installed. See `doc/replay.md`.
 Replay success verifies execution and encoded output, not detection accuracy or driving.
 

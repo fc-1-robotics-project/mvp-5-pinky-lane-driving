@@ -6,15 +6,15 @@
 
 ## 실행
 
-`replay.example.json`을 참고해 Git에서 제외되는 `replay.local.json`에 모델과
+`.agents/replay.example.json`을 참고해 Git에서 제외되는 `.agents/replay.local.json`에 모델과
 영상 경로를 설정한다. 상대 경로는 설정 파일의 디렉터리 기준이다.
 OpenCV, PyTorch, Ultralytics가 설치된 Python을 지정한다.
 
 ```bash
-./tools/harness.sh fast
-REPLAY_PYTHON=/home/seunghoon/dev_ws/ros/.venv_yolo/bin/python ./tools/harness.sh replay
+./.agents/tools/harness.sh fast
+REPLAY_PYTHON=/home/seunghoon/dev_ws/ros/.venv_yolo/bin/python ./.agents/tools/harness.sh replay
 # 특정 구간만 확인
-REPLAY_PYTHON=/home/seunghoon/dev_ws/ros/.venv_yolo/bin/python ./tools/harness.sh replay --case first_crosswalk
+REPLAY_PYTHON=/home/seunghoon/dev_ws/ros/.venv_yolo/bin/python ./.agents/tools/harness.sh replay --case first_crosswalk
 ```
 
 현재 로컬 설정은 best (2).pt와 두 upright 주행 영상의 원본 경로를 참조한다.
@@ -25,7 +25,7 @@ sample_fps를 원본 FPS 이상으로 지정한다. 기본값 5fps는 빠른 육
 
 ## 결과
 
-실행마다 `.harness/replay/run-*`에 새 결과를 생성하여 이전 실행을 보존한다.
+실행마다 `.agents/output/replay/run-*`에 새 결과를 생성하여 이전 실행을 보존한다.
 
 - `*.mp4`: segmentation 및 원본 영상 시각 overlay. 일반 영상 플레이어로 재생/탐색.
 - `*.jsonl`: 원본 프레임 번호, 시각, 클래스, confidence, 추론 소요 시간.

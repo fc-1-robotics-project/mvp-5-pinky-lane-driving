@@ -52,6 +52,7 @@ CATKIN_IGNORE
 
 # Lane project local artifacts (keep upstream exclusions above).
 .harness/
+.agents/output/
 install/
 log/
 __pycache__/

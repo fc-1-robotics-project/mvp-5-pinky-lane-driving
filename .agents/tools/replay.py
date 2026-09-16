@@ -14,7 +14,7 @@ import time
 
 
 CLASSES = {0: 'crosswalk', 1: 'left line', 2: 'right line'}
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def frame_plan(fps, total, start, end, sample_fps):
@@ -113,7 +113,7 @@ def replay_case(cv2, model, case, output, conf, imgsz, device, sample_fps):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--config', type=Path, default=ROOT / 'replay.local.json')
+    parser.add_argument('--config', type=Path, default=ROOT / '.agents' / 'replay.local.json')
     parser.add_argument('--case', action='append', help='Run named case(s) only')
     args = parser.parse_args()
     config_path = args.config.resolve()
@@ -155,7 +155,7 @@ def main():
     cv2.setNumThreads(1)
     model = YOLO(str(weights))
     validate_model(model.task, model.names)
-    base = ROOT / '.harness' / 'replay'
+    base = ROOT / '.agents' / 'output' / 'replay'
     base.mkdir(parents=True, exist_ok=True)
     output = Path(tempfile.mkdtemp(prefix='run-', dir=base))
     report = {'status': 'running', 'model': str(weights), 'model_sha256': sha256(weights),
