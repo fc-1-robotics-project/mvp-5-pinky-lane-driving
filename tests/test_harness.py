@@ -27,7 +27,8 @@ class HarnessTest(unittest.TestCase):
                     (Path(directory) / 'test_sample.py').write_text(source)
                 result = subprocess.run(
                     [sys.executable, '-c',
-                     'from tools.check import run_suite; import sys; '
+                     "import sys; sys.path.insert(0, '.agents'); "
+                     'from tools.check import run_suite; '
                      'sys.exit(run_suite(sys.argv[1]))', directory],
                     cwd=ROOT, capture_output=True, text=True, timeout=10)
                 self.assertEqual(result.returncode, expected, result.stderr)

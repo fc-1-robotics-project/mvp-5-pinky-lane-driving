@@ -52,6 +52,7 @@ CATKIN_IGNORE
 
 # Lane project local artifacts (keep upstream exclusions above).
 .harness/
+.agents/output/
 install/
 log/
 __pycache__/
@@ -64,3 +65,4 @@ __pycache__/
 *.zip
 .env
 .env.*
+replay.local.json
