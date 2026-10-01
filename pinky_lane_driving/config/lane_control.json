@@ -1,0 +1,134 @@
+{
+  "calibration": {
+    "image_size": [
+      640,
+      480
+    ],
+    "camera_frame": "front_camera_link",
+    "ground_frame": "base_footprint",
+    "mounting_id": "pinky-front-camera-v1",
+    "source": "robot1 OV5647 orientation=180, 640x480, measured 2026-09-28, 5x5 floor grid centered at x=0.25 m",
+    "lane_width_m": 0.17,
+    "camera_matrix": [
+      [
+        562.2577449297581,
+        0.0,
+        325.0889098170104
+      ],
+      [
+        0.0,
+        560.4524536230334,
+        247.5076156956044
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "distortion": [
+      0.07412663922823402,
+      -0.2159761619033038,
+      0.002077593850619344,
+      0.001709101215316724,
+      0.0
+    ],
+    "homography": [
+      [
+        1.175323794499292e-05,
+        -0.00017791670029420419,
+        -0.2287386050178534
+      ],
+      [
+        0.00042255536635000016,
+        -1.5519950492916341e-06,
+        -0.12895674993160494
+      ],
+      [
+        0.00013002280065492247,
+        -0.007157578574564959,
+        1.0
+      ]
+    ],
+    "rectified_roi": [
+      0,
+      248,
+      620,
+      350
+    ]
+  },
+  "mounting_id": "pinky-front-camera-v1",
+  "recovery_min_path_length_m": 0.06,
+  "path": {
+    "allow_single_boundary_start": true,
+    "width_tolerance": 0.08,
+    "max_near": 0.6,
+    "sample_step": 0.03,
+    "fallback_timeout": 0.3,
+    "fallback_speed": 0.03,
+    "blind_timeout": 1.5,
+    "blind_distance": 0.06,
+    "blind_speed": 0.03,
+    "ambiguity_margin": 0.08,
+    "min_coverage": 0.7,
+    "width": 0.17
+  },
+  "control": {
+    "max_speed": 0.03,
+    "max_omega": 0.6,
+    "max_accel": 0.1,
+    "max_lateral_accel": 0.12,
+    "braking_decel": 0.15,
+    "latency": 0.2,
+    "stop_margin": 0.02,
+    "timeout": 1.1,
+    "min_lookahead": 0.1,
+    "max_lookahead": 0.35,
+    "lookahead_time": 1.0,
+    "steering_gain": 1.2
+  },
+  "behavior": {
+    "cruise_speed": 0.03,
+    "approach_speed": 0.02,
+    "stop_distance": 0.15,
+    "stopped_speed": 0.01,
+    "wait_s": 2.0,
+    "clear_s": 0.5,
+    "decel": 0.15,
+    "latency": 0.2
+  },
+  "crosswalk": {
+    "group_gap": 0.2,
+    "association_distance": 0.4,
+    "passed_margin": 0.15
+  },
+  "sensors": {
+    "scan_timeout_s": 0.3,
+    "odom_timeout_s": 0.3,
+    "estop_timeout_s": 0.3,
+    "max_scan_gap_rad": 0.03,
+    "obstacle_stop_margin_m": 0.06,
+    "footprint_radius_m": 0.11,
+    "footprint_polygon_m": [
+      [
+        -0.08,
+        -0.06
+      ],
+      [
+        0.06,
+        -0.06
+      ],
+      [
+        0.06,
+        0.06
+      ],
+      [
+        -0.08,
+        0.06
+      ]
+    ],
+    "footprint_padding_m": 0.0,
+    "self_filter_radius_m": 0.07,
+    "infinity_is_clear": true
+  }
+}

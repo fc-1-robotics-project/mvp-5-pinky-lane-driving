@@ -4,12 +4,30 @@
     <arg name="use_sim_time" default="False"/> 
     <arg name="wheel_radius" default="0.027"/>
     <arg name="wheel_separation" default="0.0961"/>
+    <arg name="robot_id" default="robot1"/>
+    <arg name="start_robot_description" default="true"/>
+    <arg name="start_lidar" default="true"/>
+    <arg name="start_motors" default="true"/>
+    <arg name="start_battery" default="true"/>
+    <arg name="start_camera" default="true"/>
+    <arg name="camera_index" default="0"/>
+    <arg name="camera_role" default="viewfinder"/>
+    <arg name="camera_frame_id" default="front_camera_link"/>
+    <arg name="camera_width" default="640"/>
+    <arg name="camera_height" default="480"/>
+    <arg name="camera_pixel_format" default="RGB888"/>
+    <arg name="camera_orientation" default="180"/>
+    <arg name="camera_frame_duration_us" default="33333"/>
+    <arg name="camera_calibration_file"
+         default="$(find-pkg-share pinky_bringup)/config/pinky_camera.yaml"/>
 
-    <include file="$(find-pkg-share pinky_description)/launch/upload_robot.launch.py">
-        <arg name="use_sim_time" value="$(var use_sim_time)"/>
+    <include file="$(find-pkg-share pinky_description)/launch/upload_robot.launch.py"
+             if="$(var start_robot_description)">
+        <arg name="is_sim" value="$(var use_sim_time)"/>
     </include>
 
-    <include file="$(find-pkg-share sllidar_ros2)/launch/sllidar_c1_launch.py">
+    <include file="$(find-pkg-share sllidar_ros2)/launch/sllidar_c1_launch.py"
+             if="$(var start_lidar)">
         <arg name="serial_port" value="/dev/ttyAMA0"/>
         <arg name="frame_id" value="rplidar_link"/>
         <arg name="inverted" value="false"/>
@@ -17,13 +35,49 @@
         <arg name="scan_mode" value="DenseBoost"/>
     </include>
 
-    <node pkg="pinky_bringup" exec="bringup">
+    <node pkg="camera_ros" exec="camera_node" name="camera"
+          output="screen" if="$(var start_camera)">
+        <param name="camera" value="$(var camera_index)"/>
+        <param name="role" value="$(var camera_role)"/>
+        <param name="format" value="$(var camera_pixel_format)"/>
+        <param name="orientation" value="$(var camera_orientation)"/>
+        <param name="frame_id" value="$(var camera_frame_id)"/>
+        <param name="width" value="$(var camera_width)"/>
+        <param name="height" value="$(var camera_height)"/>
+        <param name="use_node_time" value="true"/>
+        <param name="camera_info_url"
+               value="file://$(var camera_calibration_file)"/>
+        <param name="FrameDurationLimits"
+               value="[$(var camera_frame_duration_us), $(var camera_frame_duration_us)]"/>
+    </node>
+
+    <node pkg="pinky_bringup" exec="bringup" if="$(var start_motors)">
         <param from="$(find-pkg-share pinky_bringup)/config/pinky_params.yaml"/>
         <param name="wheel_radius" value="$(var wheel_radius)"/>
         <param name="wheel_separation" value="$(var wheel_separation)"/>
     </node>
     
-    <node pkg="pinky_bringup" exec="battery_publisher">
+    <node pkg="pinky_bringup" exec="battery_publisher" if="$(var start_battery)">
+    </node>
+
+    <node pkg="pinky_led" exec="led_server"
+          name="led_service_server" output="screen">
+    </node>
+
+    <node pkg="pinky_fleet_safety" exec="drive_mode_mux"
+          name="drive_mode_mux" output="screen">
+        <param from="$(find-pkg-share pinky_fleet_safety)/config/velocity_gate.yaml"/>
+    </node>
+
+    <node pkg="pinky_fleet_safety" exec="velocity_gate"
+          name="fleet_velocity_gate" output="screen">
+        <param from="$(find-pkg-share pinky_fleet_safety)/config/velocity_gate.yaml"/>
+        <param name="robot_id" value="$(var robot_id)"/>
+    </node>
+
+    <node pkg="pinky_fleet_safety" exec="pose_reporter"
+          name="fleet_pose_reporter" output="screen">
+        <param from="$(find-pkg-share pinky_fleet_safety)/config/velocity_gate.yaml"/>
     </node>
     
 </launch>

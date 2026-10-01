@@ -21,6 +21,7 @@ class Limits:
     min_lookahead: float
     max_lookahead: float
     lookahead_time: float
+    steering_gain: float = 1.
 
     def __post_init__(self):
         for field in fields(self):
@@ -33,6 +34,8 @@ class Limits:
                 raise ValueError(f'{name} must be positive')
         if self.max_lookahead < self.min_lookahead:
             raise ValueError('Lookahead bounds are reversed')
+        if not 0 < self.steering_gain <= 2.:
+            raise ValueError('steering_gain must be positive and at most 2')
 
 
 @dataclass(frozen=True)
@@ -88,7 +91,9 @@ def command(path, *, age, dt, previous_speed, requested_speed, metric_valid, lim
     radius2 = target[0]**2 + target[1]**2
     if radius2 <= 1e-12:
         return Proposal()
-    curvature = 2 * target[1] / radius2
+    # Increase or decrease steering response without changing measured reach or
+    # the preview target. Keep the corrected curvature for the steering sweep.
+    curvature = limits.steering_gain * 2 * target[1] / radius2
     decel = limits.braking_decel
     stop_speed = (math.sqrt((decel * limits.latency)**2 + 2 * decel * usable)
                   - decel * limits.latency)

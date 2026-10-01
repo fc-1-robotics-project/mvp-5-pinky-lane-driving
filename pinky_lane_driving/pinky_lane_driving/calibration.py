@@ -82,6 +82,37 @@ class Calibration:
             raise ValueError('Pixels are outside the measured calibration domain')
         return project_ground(points, self.homography, rectified=True)
 
+    def project_visible_polygon(self, points):
+        """Clip a detection to the measured ROI before metric projection.
+
+        A crosswalk outside that domain is not a calibration failure of the
+        lane. Never extrapolate its unseen vertices beyond the measured ROI.
+        """
+        polygon = list(self.rectify(points))
+        if len(polygon) < 3:
+            raise ValueError('Polygon requires three finite vertices')
+        x0, y0, x1, y1 = self.roi
+        for axis, bound, lower in ((0, x0, True), (0, x1, False),
+                                   (1, y0, True), (1, y1, False)):
+            clipped = []
+            for a, b in zip(polygon, polygon[1:] + polygon[:1]):
+                a_inside = a[axis] >= bound if lower else a[axis] <= bound
+                b_inside = b[axis] >= bound if lower else b[axis] <= bound
+                if a_inside != b_inside:
+                    fraction = (bound - a[axis]) / (b[axis] - a[axis])
+                    intersection = tuple(a[i] + fraction * (b[i] - a[i]) for i in range(2))
+                    clipped.append(intersection)
+                if b_inside:
+                    clipped.append(b)
+            polygon = clipped
+            if len(polygon) < 3:
+                return ()
+        area2 = sum(a[0] * b[1] - b[0] * a[1]
+                    for a, b in zip(polygon, polygon[1:] + polygon[:1]))
+        if abs(area2) < 1e-9:
+            return ()
+        return project_ground(polygon, self.homography, rectified=True)
+
     def image_points(self, ground_points):
         """Project metric overlay back into the ORIGINAL distorted camera image."""
         import cv2

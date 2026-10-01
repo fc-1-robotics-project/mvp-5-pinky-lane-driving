@@ -54,3 +54,13 @@ class CalibrationTest(unittest.TestCase):
         cal = Calibration(config)
         with self.assertRaises(ValueError):
             cal.project([(5., 50.)])
+
+    def test_visible_polygon_clipping_never_extrapolates_roi(self):
+        config = synthetic_config()
+        config['rectified_roi'] = [10., 10., 90., 90.]
+        cal = Calibration(config)
+        outside = ((0., 0.), (5., 0.), (5., 5.), (0., 5.))
+        self.assertEqual(cal.project_visible_polygon(outside), ())
+        clipped = cal.project_visible_polygon(((0., 20.), (50., 20.), (50., 40.), (0., 40.)))
+        self.assertEqual(len(clipped), 4)
+        self.assertTrue(all(.5 <= x <= .9 and 0 <= y <= .4 for x, y in clipped))

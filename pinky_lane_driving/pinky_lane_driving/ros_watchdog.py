@@ -31,8 +31,12 @@ class WatchdogNode(Node):
                               max_source_age=parameter('max_source_age_s', .3),
                               max_speed=parameter('max_speed_mps', .2),
                               max_omega=parameter('max_omega_radps', .8), enabled=True)
-        # Hardware mode is an explicit deployment choice, never enabled by a message.
-        topic = 'lane/dry_run_cmd_vel' if dry_run else 'cmd_vel'
+        # Hardware mode is an explicit deployment choice, never enabled by a
+        # message. It still feeds the robot-local mode mux rather than /cmd_vel.
+        output_topic = parameter('output_topic', 'cmd_vel_lane_candidate')
+        if not isinstance(output_topic, str) or not output_topic:
+            raise ValueError('output_topic must be a non-empty string')
+        topic = 'lane/dry_run_cmd_vel' if dry_run else output_topic
         self.publisher = self.create_publisher(Twist, topic, 1)
         self.subscription = self.create_subscription(String, 'lane/command', self.receive, 1)
         self.timer = self.create_timer(.02, self.publish,
@@ -44,8 +48,11 @@ class WatchdogNode(Node):
             if len(message.data) > 4096:
                 raise ValueError('Oversized command')
             payload = json.loads(message.data)
-            if set(payload) != {'sequence', 'capture_stamp', 'speed', 'omega'}:
+            required = {'sequence', 'capture_stamp', 'speed', 'omega'}
+            if set(payload) not in (required, required | {'reason'}):
                 raise ValueError('Unexpected command fields')
+            if 'reason' in payload and not isinstance(payload['reason'], str):
+                raise ValueError('Invalid command reason')
             source_age = self.get_clock().now().nanoseconds / 1e9 - payload['capture_stamp']
             if not self.guard.receive(payload['sequence'], payload['speed'], payload['omega'],
                                       now=time.monotonic(), source_age=source_age):

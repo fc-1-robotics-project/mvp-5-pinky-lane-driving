@@ -12,13 +12,25 @@ from .tracking import relative_pose
 
 
 class DriveCore:
-    def __init__(self, tracker, limits, behavior_settings, crosswalk_tracker, *, scan_timeout):
+    def __init__(self, tracker, limits, behavior_settings, crosswalk_tracker, *, scan_timeout,
+                 crosswalk_control_enabled=True, recovery_min_path_length_m=None):
         if not math.isfinite(scan_timeout) or scan_timeout <= 0:
             raise ValueError('Scan timeout must be finite and positive')
+        if type(crosswalk_control_enabled) is not bool:
+            raise ValueError('crosswalk_control_enabled must be a boolean')
+        if recovery_min_path_length_m is None:
+            recovery_min_path_length_m = limits.stop_margin
+        if (isinstance(recovery_min_path_length_m, bool)
+                or not isinstance(recovery_min_path_length_m, (int, float))
+                or not math.isfinite(recovery_min_path_length_m)
+                or recovery_min_path_length_m < 0):
+            raise ValueError('recovery_min_path_length_m must be finite and nonnegative')
         self.tracker = tracker
         self.limits = limits
+        self.recovery_min_path_length_m = float(recovery_min_path_length_m)
         self.behavior = Behavior(behavior_settings)
         self.crosswalks = crosswalk_tracker
+        self.crosswalk_control_enabled = crosswalk_control_enabled
         self.scan_timeout = scan_timeout
         self.lane = LanePath()
         self.polygons = ()
@@ -34,12 +46,15 @@ class DriveCore:
         self.capture_pose = self.capture_stamp = None
         try:
             transform_points([], pose)
-            lane = self.tracker.update(observation, now=now, pose=pose)
+            lane = self.tracker.update(observation, now=now, pose=pose,
+                                       min_path_length=self.recovery_min_path_length_m)
             if not lane.valid:
                 self.lane = lane
                 return
-            polygons = tuple(self.tracker.calibration.project(d['polygon_px'])
-                             for d in observation['detections'] if d['class_id'] == 0)
+            polygons = ()
+            if self.crosswalk_control_enabled:
+                polygons = tuple(polygon for d in observation['detections'] if d['class_id'] == 0
+                                 if (polygon := self.tracker.calibration.project_visible_polygon(d['polygon_px'])))
             self.lane, self.polygons = lane, polygons
             self.capture_pose, self.capture_stamp = pose, observation['capture_time_s']
         except (KeyError, ValueError, TypeError, IndexError):
@@ -63,8 +78,9 @@ class DriveCore:
             if valid:
                 transform = relative_pose(self.capture_pose, pose)
                 current_path = transform_points(self.lane.points, transform)
-                polygons = [transform_points(p, transform) for p in self.polygons]
-                event, passed = self.crosswalks.update(polygons, current_path, pose)
+                if self.crosswalk_control_enabled:
+                    polygons = [transform_points(p, transform) for p in self.polygons]
+                    event, passed = self.crosswalks.update(polygons, current_path, pose)
             decision = self.behavior.step(now, sensors_ok=valid, estop=estop,
                                           obstacle=scan_hit if valid else None,
                                           crosswalk=event, passed_id=passed,

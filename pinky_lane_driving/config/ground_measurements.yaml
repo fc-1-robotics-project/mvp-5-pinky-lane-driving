@@ -1,0 +1,74 @@
+mounting_id: pinky-front-camera-v1
+camera_frame: front_camera_link
+source: "robot1 OV5647 orientation=180, 640x480, measured 2026-09-28, 5x5 floor grid centered at x=0.25 m"
+lane_width_m: 0.17
+rectified_roi: [0, 248, 620, 350]
+max_reprojection_error_m: 0.03
+
+correspondences:
+  - {pixel: [214.523, 252.339], ground: [0.35, 0.05]}
+  - {pixel: [307.544, 252.393], ground: [0.35, 0.00]}
+  - {pixel: [398.457, 254.276], ground: [0.35, -0.05]}
+  - {pixel: [198.045, 272.306], ground: [0.30, 0.05]}
+  - {pixel: [302.827, 272.396], ground: [0.30, 0.00]}
+  - {pixel: [414.320, 274.323], ground: [0.30, -0.05]}
+  - {pixel: [521.067, 276.251], ground: [0.30, -0.10]}
+  - {pixel: [174.730, 299.023], ground: [0.25, 0.05]}
+  - {pixel: [303.019, 300.362], ground: [0.25, 0.00]}
+  - {pixel: [438.414, 303.881], ground: [0.25, -0.05]}
+  - {pixel: [571.690, 306.622], ground: [0.25, -0.10]}
+  - {pixel: [136.131, 343.810], ground: [0.20, 0.05]}
+  - {pixel: [302.030, 344.321], ground: [0.20, 0.00]}
+  - {pixel: [477.645, 347.316], ground: [0.20, -0.05]}
+  - {pixel: [63.971, 427.569], ground: [0.15, 0.05]}
+  - {pixel: [305.464, 427.367], ground: [0.15, 0.00]}
+  - {pixel: [549.457, 426.213], ground: [0.15, -0.05]}
+
+# Conservative initial tuning. These are not calibration measurements and must
+# still be verified with lifted wheels and then low-speed physical testing.
+path:
+  width_tolerance: 0.08
+  max_near: 0.60
+  sample_step: 0.03
+  fallback_timeout: 0.30
+  fallback_speed: 0.03
+  ambiguity_margin: 0.08
+  min_coverage: 0.70
+
+control:
+  max_speed: 0.08
+  max_omega: 0.60
+  max_accel: 0.10
+  max_lateral_accel: 0.12
+  braking_decel: 0.15
+  latency: 0.20
+  stop_margin: 0.06
+  timeout: 0.30
+  min_lookahead: 0.12
+  max_lookahead: 0.35
+  lookahead_time: 1.0
+
+behavior:
+  cruise_speed: 0.06
+  approach_speed: 0.03
+  stop_distance: 0.15
+  stopped_speed: 0.01
+  wait_s: 2.0
+  clear_s: 0.5
+  decel: 0.15
+  latency: 0.20
+
+crosswalk:
+  group_gap: 0.20
+  association_distance: 0.40
+  passed_margin: 0.15
+
+sensors:
+  scan_timeout_s: 0.30
+  odom_timeout_s: 0.30
+  estop_timeout_s: 0.30
+  max_scan_gap_rad: 0.03
+  footprint_radius_m: 0.15
+  # sllidar_ros2 publishes +inf when the measured distance is zero, i.e. no
+  # valid return was detected for that angular sample.
+  infinity_is_clear: true

@@ -33,6 +33,9 @@ class PerceptionNode(Node):
         topic = parameter('image_topic', 'camera/image_raw')
         model_path = parameter('model_path', '')
         device = parameter('device', 'cpu')
+        cpu_threads = parameter('cpu_threads', 1)
+        if type(cpu_threads) is not int or not 1 <= cpu_threads <= 4:
+            raise ValueError('cpu_threads must be an integer within 1..4')
         imgsz, conf = parameter('imgsz', 640), parameter('confidence', .25)
         if imgsz <= 0 or imgsz % 32 or not math.isfinite(conf) or not 0 <= conf <= 1:
             raise ValueError('Invalid image size or confidence')
@@ -40,17 +43,27 @@ class PerceptionNode(Node):
             if not Path(model_path).is_file():
                 raise ValueError('Provide a trusted local model_path; no automatic download')
             import torch
+            import cv2
             from ultralytics import YOLO
-            torch.set_num_threads(1)
+            cv2.setNumThreads(1)
+            torch.set_num_threads(cpu_threads)
             model = YOLO(model_path)
             validate_model(model.task, model.names)
 
             def predictor(message):
+                started = time.monotonic()
                 frame = decode_image(message)
+                # Ultralytics' initial device setup resets PyTorch's thread
+                # count. Reassert the budget on every subsequent frame so CPU
+                # inference cannot monopolize camera/control/watchdog cores.
+                torch.set_num_threads(cpu_threads)
                 result = model.predict(frame, imgsz=imgsz, conf=conf, device=device,
                                        retina_masks=True, verbose=False)[0]
-                return trace_observation(observe_result(result, self.stamp(message),
-                                                        message.header.frame_id))
+                observation = trace_observation(observe_result(
+                    result, self.stamp(message), message.header.frame_id))
+                observation['processing_time_s'] = time.monotonic() - started
+                observation['cpu_threads'] = torch.get_num_threads()
+                return observation
 
         self.predictor = predictor
         self.pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix='lane_inference')

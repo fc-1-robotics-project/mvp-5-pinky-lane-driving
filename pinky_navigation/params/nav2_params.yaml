@@ -1,9 +1,9 @@
 amcl:
   ros__parameters:
-    alpha1: 0.2
-    alpha2: 0.2
-    alpha3: 0.2
-    alpha4: 0.2
+    alpha1: 0.4
+    alpha2: 0.4
+    alpha3: 0.6
+    alpha4: 0.6
     alpha5: 0.2
     base_frame_id: "base_footprint"
     beam_skip_distance: 0.5
@@ -16,29 +16,30 @@ amcl:
     laser_max_range: 100.0
     laser_min_range: -1.0
     laser_model_type: "likelihood_field"
-    max_beams: 60
-    max_particles: 2000
-    min_particles: 500
+    max_beams: 120
+    max_particles: 3000
+    min_particles: 800
     odom_frame_id: "odom"
     pf_err: 0.05
     pf_z: 0.99
-    recovery_alpha_fast: 0.0
-    recovery_alpha_slow: 0.0
+    recovery_alpha_fast: 0.1
+    recovery_alpha_slow: 0.0001
     resample_interval: 1
     robot_model_type: "nav2_amcl::DifferentialMotionModel"
     save_pose_rate: 0.5
-    sigma_hit: 0.2
+    sigma_hit: 0.15
     tf_broadcast: true
     transform_tolerance: 1.0
-    update_min_a: 0.1
-    update_min_d: 0.15
-    z_hit: 0.5
-    z_max: 0.05
-    z_rand: 0.5
-    z_short: 0.05
+    update_min_a: 0.05
+    update_min_d: 0.05
+    z_hit: 0.85
+    z_max: 0.0
+    z_rand: 0.15
+    z_short: 0.0
     scan_topic: scan
-    set_initial_pose: true
-    initial_pose: [0, 0, 0]
+    # An operator supplies the measured map pose through /initialpose.
+    # Do not initialize a relocated robot at a hard-coded map coordinate.
+    set_initial_pose: false
 
 bt_navigator:
   ros__parameters:
@@ -80,17 +81,17 @@ controller_server:
       stateful: true                         # 플러그인이 이전 상태를 기억할지 여부
 
       # 기본 주행 및 속도
-      desired_linear_vel: 0.2                # [m/s] 목표 기본 직진 속도
+      desired_linear_vel: 0.10               # [m/s] velocity_smoother 최대 직진 속도와 일치
       allow_reversing: false                 # 후진 허용 여부 (false: 무조건 전진/제자리 회전으로 해결)
       max_angular_accel: 3.2                 # [rad/s^2] 최대 각가속도 (회전할 때 얼마나 빨리 가속할지)
 
       # 경로 추종 (Lookahead, 시선 두기)
-      lookahead_dist: 0.6                    # [m] 기본 전방 주시 거리
+      lookahead_dist: 0.2                    # [m] 기본 전방 주시 거리
       use_velocity_scaled_lookahead_dist: true # 현재 속도에 비례해 주시 거리를 늘릴지 여부
-      lookahead_time: 1.5                    # [s] 속도 비례 주시 시간 (속도 * 시간 = 주시 거리)
-      min_lookahead_dist: 0.3                # [m] 최소 주시 거리
-      max_lookahead_dist: 0.9                # [m] 최대 주시 거리
-      curvature_lookahead_dist: 0.6          # [m] 경로의 곡률(커브)을 계산하기 위해 내다보는 거리
+      lookahead_time: 1.0                    # [s] 속도 비례 주시 시간 (속도 * 시간 = 주시 거리)
+      min_lookahead_dist: 0.12                # [m] 최소 주시 거리
+      max_lookahead_dist: 0.40                # [m] 최대 주시 거리
+      curvature_lookahead_dist: 0.2          # [m] 경로의 곡률(커브)을 계산하기 위해 내다보는 거리
       use_fixed_curvature_lookahead: false   # 곡률 계산용 거리를 고정값으로 쓸지 여부 (false면 주시거리와 연동)
 
       # 제자리 회전 (고개 먼저 돌리기)
@@ -115,7 +116,7 @@ controller_server:
 
       # 안전 및 충돌 방지
       use_collision_detection: true          # 현재 위치부터 주시점(Lookahead)까지 충돌 여부 미리 검사
-      max_allowed_time_to_collision_up_to_carrot: 1.0 # 주시점(Carrot)까지 가는 도중 충돌까지 허용되는 최대 시간 
+      max_allowed_time_to_collision_up_to_carrot: 0.7 # 실제 최대 속도 기준 미래 충돌 검사 시간
       max_robot_pose_search_dist: 1.4875     # [m] 전역 경로 상에서 로봇과 가장 가까운 점을 찾을 때 최대 탐색 거리
       transform_tolerance: 0.2               # [s] TF(좌표계 변환) 데이터 최대 허용 지연 시간
 
@@ -155,7 +156,7 @@ controller_server:
     general_goal_checker:
       plugin: "nav2_controller::SimpleGoalChecker"
       stateful: true
-      xy_goal_tolerance: 0.25                    # [m] 목표 지점 반경 0.25m 안에 들어오면 도착 인정
+      xy_goal_tolerance: 0.05                    # [m] 목표 지점 반경 0.25m 안에 들어오면 도착 인정
       yaw_goal_tolerance: 0.25                   # [rad] 목표 각도 오차 약 14도 이내면 올바르게 본 것으로 인정
 
     # ==========================================================
@@ -180,14 +181,15 @@ local_costmap:
       rolling_window: true
       width: 3
       height: 3
-      resolution: 0.05
+      resolution: 0.02
       #robot_radius: 0.22
+      footprint_padding: 0.0
       footprint: '[[0.06, 0.06], [0.06, -0.06], [-0.06, -0.06], [-0.06, 0.06]]'
       plugins: ["voxel_layer", "inflation_layer"]
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.15
+        inflation_radius: 0.07
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: True
@@ -207,7 +209,7 @@ local_costmap:
           raytrace_max_range: 3.0
           raytrace_min_range: 0.0
           obstacle_max_range: 2.5
-          obstacle_min_range: 0.0
+          obstacle_min_range: 0.08
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
@@ -216,14 +218,14 @@ local_costmap:
 global_costmap:
   global_costmap:
     ros__parameters:
-      footprint_padding: 0.03
+      footprint_padding: 0.0
       update_frequency: 1.0
       publish_frequency: 1.0
       global_frame: map
       robot_base_frame: base_footprint
       #robot_radius: 0.22
       footprint: '[[0.06, 0.06], [0.06, -0.06], [-0.06, -0.06], [-0.06, 0.06]]'
-      resolution: 0.05
+      resolution: 0.02
       track_unknown_space: true
       plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
       obstacle_layer:
@@ -239,14 +241,14 @@ global_costmap:
           raytrace_max_range: 3.0
           raytrace_min_range: 0.0
           obstacle_max_range: 2.5
-          obstacle_min_range: 0.0
+          obstacle_min_range: 0.08
       static_layer:
         plugin: "nav2_costmap_2d::StaticLayer"
         map_subscribe_transient_local: True
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.15
+        inflation_radius: 0.07
       always_send_full_costmap: True
 
 # The yaml_filename does not need to be specified since it going to be set by defaults in launch.
@@ -327,10 +329,10 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: False
     feedback: "OPEN_LOOP"
-    max_velocity: [0.25, 0.0, 1.5]
-    min_velocity: [-0.25, 0.0, -1.5]
-    max_accel: [2.5, 0.0, 3.2]
-    max_decel: [-2.5, 0.0, -3.2]
+    max_velocity: [0.10, 0.0, 1.5]
+    min_velocity: [-0.10, 0.0, -1.5]
+    max_accel: [1.5, 0.0, 3.2]
+    max_decel: [-1.5, 0.0, -3.2]
     odom_topic: "odom"
     odom_duration: 0.1
     deadband_velocity: [0.0, 0.0, 0.0]

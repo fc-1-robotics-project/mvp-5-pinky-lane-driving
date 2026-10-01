@@ -27,6 +27,43 @@ class ControlTest(unittest.TestCase):
         self.assertGreater(self.run_control([(0., 0.), (1., .3)]).omega, 0.)
         self.assertLess(self.run_control([(0., 0.), (1., -.3)]).omega, 0.)
 
+    def test_steering_gain_preserves_target_and_increases_both_turn_directions(self):
+        self.assertEqual(self.limits.steering_gain, 1.)
+        for side in (1., -1.):
+            with self.subTest(side=side):
+                path = [(0., 0.), (1., side * .3)]
+                original = self.run_control(path)
+                boosted = self.run_control(path, limits=replace(self.limits, steering_gain=1.2))
+                self.assertEqual(boosted.target, original.target)
+                self.assertAlmostEqual(boosted.curvature, 1.2 * original.curvature)
+                self.assertGreater(side * boosted.omega, side * original.omega)
+                self.assertAlmostEqual(boosted.omega, boosted.speed * boosted.curvature)
+
+    def test_steering_gain_keeps_far_preview_when_near_point_has_opposite_sign(self):
+        path = [(.20, -.007), (.23, -.008), (.26, -.005), (.29, .002), (.33, .011)]
+        original = self.run_control(path)
+        boosted = self.run_control(path, limits=replace(self.limits, steering_gain=1.2))
+        self.assertGreater(original.target[1], 0.)
+        self.assertEqual(boosted.target, original.target)
+        self.assertGreater(boosted.omega, original.omega)
+
+    def test_steering_gain_respects_angular_and_lateral_limits(self):
+        path = [(0., 0.), (.3, .3), (.6, .6)]
+        boosted = self.run_control(path, limits=replace(self.limits, steering_gain=2.))
+        self.assertLessEqual(abs(boosted.omega), self.limits.max_omega + 1e-12)
+        self.assertLessEqual(abs(boosted.speed * boosted.omega),
+                             self.limits.max_lateral_accel + 1e-12)
+        lateral_limited = self.run_control(
+            path, previous_speed=.4, requested_speed=.4,
+            limits=replace(self.limits, max_speed=.4, max_omega=10., steering_gain=2.))
+        self.assertLessEqual(abs(lateral_limited.speed * lateral_limited.omega),
+                             self.limits.max_lateral_accel + 1e-12)
+
+    def test_steering_gain_configuration_bounds(self):
+        for gain in (0., -1., 2.001, math.inf, math.nan):
+            with self.subTest(gain=gain), self.assertRaises(ValueError):
+                replace(self.limits, steering_gain=gain)
+
     def test_stop_on_invalid_stale_or_unmeasured_path(self):
         for path, changes in [([], {}), ([(0., 0.)], {}),
                               ([(0., 0.), (0., 0.)], {}),

@@ -5,7 +5,7 @@
 import math
 import unittest
 
-from pinky_lane_driving.obstacles import scan_collision, transform_points
+from pinky_lane_driving.obstacles import scan_collision, transform_points, swept_footprint_hit, convex_footprint, stopping_corridor, steering_corridor
 
 
 class ObstacleTest(unittest.TestCase):
@@ -46,3 +46,143 @@ class ObstacleTest(unittest.TestCase):
         self.assertAlmostEqual(point[1], 4.)
         with self.assertRaises(ValueError):
             transform_points([(math.nan, 0.)], (0., 0., 0.))
+
+    def body(self):
+        return convex_footprint([(-.08,-.06),(.06,-.06),(.06,.06),(-.08,.06)])
+
+    def test_polygon_keeps_clear_side_wall_but_stops_front(self):
+        self.assertFalse(self.scan([.107], angle_min=-math.pi/2,
+                                   footprint=self.body(), padding=.01))
+        self.assertTrue(self.scan([.2], footprint=self.body(), padding=.01))
+        self.assertTrue(self.scan([.065], angle_min=-math.pi/2,
+                                  footprint=self.body(), padding=.01))
+
+    def test_polygon_includes_rear_body_and_initial_heading(self):
+        self.assertTrue(swept_footprint_hit([(-.075,0.)], [(0.,0.),(.3,0.)], self.body(), .01))
+        self.assertTrue(swept_footprint_hit([(.05,-.05)], [(0.,0.),(0.,.3)], self.body(), .01))
+
+    def test_corner_rotation_is_conservative(self):
+        body=convex_footprint([(-.1,-.01),(.1,-.01),(.1,.01),(-.1,.01)])
+        p=(.1*math.cos(math.pi/4),.1*math.sin(math.pi/4))
+        self.assertTrue(swept_footprint_hit([p],[(0.,0.),(0.,.4)],body,0.))
+
+    def test_self_filter_only_excludes_confirmed_small_body_region(self):
+        kwargs=dict(footprint=self.body(), padding=.01,
+                    self_filter_bounds=(.035,.052,-.04,.04), self_filter_pose=(0.,0.,0.))
+        self.assertFalse(self.scan([.044], **kwargs))
+        self.assertTrue(self.scan([.07], **kwargs))
+        self.assertTrue(self.scan([.2], **kwargs))
+        self.assertIsNone(self.scan([math.nan], **kwargs))
+        self.assertIsNone(self.scan([.044], **dict(kwargs, age=.5)))
+        self.assertIsNone(self.scan([.044], **dict(kwargs, self_filter_bounds=(0.,.2,-.04,.04))))
+
+    def test_self_filter_uses_capture_frame_not_motion_compensation(self):
+        kwargs=dict(footprint=self.body(), padding=.01,
+                    self_filter_bounds=(.035,.052,-.04,.04), self_filter_pose=(0.,0.,0.))
+        # An external point that moves inside the mask in the current frame must
+        # not be mistaken for a body return in the original scan-time frame.
+        self.assertTrue(self.scan([.1], scan_pose=(-.056,0.,0.), **kwargs))
+        self.assertFalse(self.scan([.044], scan_pose=(.1,0.,0.), **kwargs))
+
+    def test_confirmed_body_returns_vary_within_front_assembly(self):
+        kwargs=dict(footprint=self.body(),padding=.01,
+                    self_filter_bounds=(.025,.055,-.04,.04),self_filter_pose=(-.017,0.,math.pi))
+        for distance in (.054,.067,.070):
+            # Front-right assembly at the observed ~24 degree laser direction.
+            self.assertFalse(self.scan([distance],angle_min=math.pi-math.radians(24),
+                                       scan_pose=(-.017,0.,math.pi),**kwargs))
+        self.assertTrue(self.scan([.12],angle_min=math.pi-math.radians(24),
+                                  scan_pose=(-.017,0.,math.pi),**kwargs))
+
+    def test_explicit_nine_cm_radius_uses_robot_center_not_laser_center(self):
+        kwargs=dict(footprint=self.body(),padding=.01,self_filter_radius=.09,
+                    self_filter_pose=(-.017,0.,math.pi),scan_pose=(-.017,0.,math.pi))
+        # Range .1 from the offset laser is robot-forward x=.083: masked.
+        self.assertFalse(self.scan([.1],angle_min=math.pi,**kwargs))
+        self.assertTrue(self.scan([.108],angle_min=math.pi,**kwargs))
+        self.assertFalse(self.scan([.106],angle_min=math.pi,**kwargs))
+
+    def test_mask_excludes_spatial_near_body_returns_not_unknown_sensor_data(self):
+        kwargs=dict(footprint=self.body(),padding=.01,self_filter_radius=.09,
+                    self_filter_pose=(0.,0.,0.))
+        self.assertFalse(self.scan([.01],**kwargs))
+        for value in (math.nan,-math.inf,0.,-.01):
+            self.assertIsNone(self.scan([value],**kwargs))
+        self.assertIsNone(self.scan([.01],**dict(kwargs,self_filter_pose=(.2,0.,0.))))
+        self.assertIsNone(self.scan([.01],**dict(kwargs,self_filter_radius=.3)))
+        self.assertIsNone(self.scan([.01],**dict(kwargs,age=.5)))
+
+    def test_invalid_polygon_is_unknown(self):
+        for polygon in ([(0.,0.),(1.,0.)],[(1.,1.),(2.,1.),(2.,2.)],
+                        [(-.1,-.1),(.1,-.1),(0.,0.),(.1,.1),(-.1,.1)]):
+            self.assertIsNone(self.scan([.5], footprint=polygon))
+
+    def corridor(self, path, **overrides):
+        args=dict(max_speed=.08,measured_speed=0.,decel=.15,latency=.2,
+                  scan_timeout=.3,observation_timeout=.3,timer_period=.05,stop_margin=.06)
+        args.update(overrides)
+        return stopping_corridor(path,**args)
+
+    def test_stopping_horizon_uses_maximum_speed_even_at_rest(self):
+        path,horizon=self.corridor([(.2,0.),(.4,0.)])
+        self.assertAlmostEqual(horizon,.08*.85+.08**2/.3+.06)
+        self.assertAlmostEqual(path[-1][0],horizon)
+        self.assertTrue(self.scan([.15],path=path,footprint=self.body(),padding=.01))
+        self.assertFalse(self.scan([.4],path=path,footprint=self.body(),padding=.01))
+        self.assertIsNone(self.scan([math.nan],path=path,footprint=self.body(),padding=.01))
+
+    def test_speed_above_limit_or_more_latency_expands_horizon(self):
+        _,h1=self.corridor([(.2,0.),(.8,0.)])
+        _,h2=self.corridor([(.2,0.),(.8,0.)],measured_speed=.2)
+        _,h3=self.corridor([(.2,0.),(.8,0.)],scan_timeout=.6)
+        self.assertGreater(h2,h1)
+        self.assertGreater(h3,h1)
+
+    def test_stopping_horizon_preserves_near_end_and_curves(self):
+        near=((.03,0.),(.06,0.))
+        path,_=self.corridor(near)
+        self.assertEqual(path,((0.,0.),)+near)
+        path,horizon=self.corridor([(.04,0.),(.04,.4)])
+        self.assertAlmostEqual(path[-1][0],.04)
+        self.assertAlmostEqual(path[-1][1],horizon-.04)
+        with self.assertRaises(ValueError):
+            self.corridor([(.2,0.),(.4,0.)],decel=0.)
+
+    def test_command_arc_checks_off_lane_obstacles_and_discretization(self):
+        path=((0.,0.),(.2,0.))
+        arc,guard=steering_corridor(.2,5.,.1)
+        self.assertGreater(guard,0.)
+        point=arc[-1]
+        angle=math.atan2(point[1],point[0])
+        ranges=[math.hypot(*point)]
+        self.assertFalse(self.scan(ranges,angle_min=angle,path=path,radius=.01))
+        self.assertTrue(self.scan(ranges,angle_min=angle,path=path,radius=.01,
+                                  steering_path=arc,steering_guard=guard))
+
+    def test_steering_arc_symmetry_and_straight(self):
+        left,guard=steering_corridor(.2,2.,.1)
+        right,right_guard=steering_corridor(.2,-2.,.1)
+        self.assertEqual(guard,right_guard)
+        self.assertAlmostEqual(left[-1][0],right[-1][0])
+        self.assertAlmostEqual(left[-1][1],-right[-1][1])
+        straight,guard=steering_corridor(.2,0.,.1)
+        self.assertEqual(straight[-1],(.2,0.))
+        self.assertEqual(guard,0.)
+
+    def test_side_wall_off_command_arc_preserves_front_and_turn_obstacles(self):
+        body = ((-.08, -.06), (.06, -.06), (.06, .06), (-.08, .06))
+        horizon = .1125
+        for sign in (-1., 1.):
+            arc, guard = steering_corridor(horizon, sign * 2.873239, .1)
+            wall = (.153, -sign * .083)
+            def hit(point, path):
+                return self.scan([math.hypot(*point)],
+                    angle_min=math.atan2(point[1], point[0]),
+                    path=path, footprint=body, radius=.11,
+                    steering_path=arc, steering_guard=guard)
+            diagonal = ((0., 0.), (.109629, -sign * .025255))
+            forward = ((0., 0.), (horizon, 0.))
+            self.assertTrue(hit(wall, diagonal))
+            self.assertFalse(hit(wall, forward))
+            for obstacle in ((.15, 0.), (.14, sign * .07), (.04, -sign * .04)):
+                self.assertTrue(hit(obstacle, forward))

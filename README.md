@@ -1,3 +1,5 @@
+> **2026-10-01 현장 버전 팀 공유:** 설치·실행은 [TEAM_LANE_GUIDE.md](TEAM_LANE_GUIDE.md)를 확인하세요.
+
 # Pinky Pro
 ROS2 packages for Pinky Pro
 

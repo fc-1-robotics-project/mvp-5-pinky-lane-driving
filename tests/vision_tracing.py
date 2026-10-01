@@ -44,6 +44,23 @@ class TracingTest(unittest.TestCase):
         self.assertGreater(points[-1][0], 75)
         self.assertTrue(any(y < 45 and x < 40 for x, y in points))
 
+    def test_outer_diagonal_still_starts_at_bottommost_endpoint(self):
+        polygon = [(485, 276), (493, 270), (576, 346), (568, 354)]
+        points = trace_polygon(polygon, (640, 480))
+        self.assertGreater(len(points), 5)
+        self.assertGreater(points[0][1], points[-1][1])
+
+    def test_large_cropped_strip_and_diagonal_have_open_endpoints(self):
+        for polygon in (
+                [(280, 120), (310, 120), (310, 479), (280, 479)],
+                [(80, 180), (90, 170), (639, 459), (629, 479)],
+                [(20, 479), (50, 479), (50, 150), (600, 150),
+                 (600, 120), (20, 120)]):
+            points = trace_polygon(polygon, (640, 480))
+            self.assertGreater(len(points), 20)
+            self.assertGreater(points[0][1], points[-1][1])
+            self.assertTrue(all(0 <= x <= 640 and 0 <= y <= 480 for x, y in points))
+
     def test_invalid_or_degenerate_mask_fails(self):
         for polygon in [[], [(0, 0)], [(1, 1), (1, 1), (1, 1)]]:
             with self.assertRaises(ValueError):

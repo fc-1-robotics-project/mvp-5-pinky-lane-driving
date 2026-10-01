@@ -29,6 +29,23 @@ class WatchdogTest(unittest.TestCase):
         self.assertEqual(dog.output(1.04), (.1, .2))
         self.assertEqual(dog.output(1.06), (0., 0.))
 
+    def test_slower_image_profile_does_not_extend_command_silence_lease(self):
+        dog=Watchdog(timeout=.2,max_source_age=.45,max_speed=.2,max_omega=.8,enabled=True)
+        self.assertTrue(dog.receive(1,.03,.1,now=1.,source_age=.35))
+        self.assertEqual(dog.output(1.09),(.03,.1))
+        self.assertEqual(dog.output(1.11),(0.,0.))
+        self.assertTrue(dog.receive(2,.03,.1,now=2.,source_age=.1))
+        self.assertEqual(dog.output(2.21),(0.,0.))
+
+    def test_slow_three_cm_profile_stops_on_age_or_silence(self):
+        dog=Watchdog(timeout=.2,max_source_age=1.1,max_speed=.03,max_omega=.6,enabled=True)
+        self.assertTrue(dog.receive(1,.03,.1,now=1.,source_age=.9))
+        self.assertEqual(dog.output(1.16),(.03,.1))
+        self.assertEqual(dog.output(1.21),(0.,0.))
+        self.assertTrue(dog.receive(2,.03,.1,now=2.,source_age=1.05))
+        self.assertEqual(dog.output(2.06),(0.,0.))
+        self.assertFalse(dog.receive(3,.04,.1,now=3.,source_age=.1))
+
     def test_duplicate_or_out_of_order_cannot_refresh_lease(self):
         dog = self.make()
         dog.receive(3, .1, .2, now=1., source_age=.01)
