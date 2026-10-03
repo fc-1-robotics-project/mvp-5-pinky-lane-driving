@@ -100,7 +100,7 @@ class MissionGuard:
             return 'unexpected_drive_mode' if self.sustained('mode', True, now, 2.) else ''
         self.holds.pop('mode', None)
         v, w = self.values['velocity']
-        if not finite(v) or not finite(w) or abs(v) > .0305 or abs(w) > .605:
+        if not finite(v) or not finite(w) or abs(v) > .0605 or abs(w) > .605:
             return 'velocity_limit_exceeded'
         if not self.fresh('command', now, .5):
             return 'lane_command_stale'

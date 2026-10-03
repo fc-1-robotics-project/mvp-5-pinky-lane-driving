@@ -65,16 +65,16 @@
     "max_near": 0.6,
     "sample_step": 0.03,
     "fallback_timeout": 0.3,
-    "fallback_speed": 0.03,
+    "fallback_speed": 0.06,
     "blind_timeout": 1.5,
     "blind_distance": 0.06,
-    "blind_speed": 0.03,
+    "blind_speed": 0.06,
     "ambiguity_margin": 0.08,
     "min_coverage": 0.7,
     "width": 0.17
   },
   "control": {
-    "max_speed": 0.03,
+    "max_speed": 0.06,
     "max_omega": 0.6,
     "max_accel": 0.1,
     "max_lateral_accel": 0.12,
@@ -88,7 +88,7 @@
     "steering_gain": 1.2
   },
   "behavior": {
-    "cruise_speed": 0.03,
+    "cruise_speed": 0.06,
     "approach_speed": 0.02,
     "stop_distance": 0.15,
     "stopped_speed": 0.01,

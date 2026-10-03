@@ -63,8 +63,16 @@ class MissionGuardTest(unittest.TestCase):
                 g.note(key,value,now)
             problem=g.fault(now)
         self.assertEqual(problem,'no_odom_progress')
-        g.note('velocity',(.05,0.),8.)
+        g.note('velocity',(.061,0.),8.)
         self.assertEqual(g.fault(8.),'velocity_limit_exceeded')
+
+    def test_six_cm_speed_and_over_limit_boundary(self):
+        g = self.ready()
+        self.assertEqual(self.active_sample(g, 1., (.06, .6)), '')
+        self.assertEqual(self.active_sample(g, 1.1, (.061, 0.)),
+                         'velocity_limit_exceeded')
+        self.assertEqual(self.active_sample(g, 1.2, (.06, .606)),
+                         'velocity_limit_exceeded')
 
     def test_obstacle_wait_does_not_expire_restart_motion_timer(self):
         g = self.ready()

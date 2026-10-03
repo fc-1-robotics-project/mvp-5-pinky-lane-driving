@@ -9,6 +9,7 @@ from pinky_interfaces.action import FollowLane
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.executors import MultiThreadedExecutor
+from rclpy.parameter import Parameter
 from std_msgs.msg import Bool, String
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
@@ -38,6 +39,7 @@ class LaneMissionTest(unittest.TestCase):
         self.finish_pub = self.probe.create_publisher(Bool, 'lane/finish', 10)
         self.modes = []
         self.live_mode = 'STOP'
+        self.linear_speed = 0.
         self.permit = True
         self.diagnostic_pub = self.probe.create_publisher(String, 'lane/diagnostics', 10)
         self.mode_pub = self.probe.create_publisher(String, 'drive/mode_status', 10)
@@ -66,14 +68,17 @@ class LaneMissionTest(unittest.TestCase):
 
     def publish(self):
         self.mode_pub.publish(String(data=json.dumps(dict(mode=self.live_mode))))
-        self.cmd_pub.publish(Twist())
+        velocity = Twist()
+        if self.live_mode == 'LANE':
+            velocity.linear.x = self.linear_speed
+        self.cmd_pub.publish(velocity)
         self.odom_pub.publish(Odometry())
         self.gate_pub.publish(RobotHeartbeat(permit_fresh=self.permit, gate_mode=1))
         self.diagnostic_pub.publish(String(data=json.dumps(dict(lane_valid=True,
             lane_reason='paired', scan_hit=False, scan_coverage_ok=True,
             capture_age_s=.1, scan_age_s=.1, odom_age_s=.1))))
         if self.send_commands:
-            payload = dict(reason=self.reason, capture_stamp=time.time(), speed=.03, omega=0.)
+            payload = dict(reason=self.reason, capture_stamp=time.time(), speed=.06, omega=0.)
             self.command_pub.publish(String(data=json.dumps(payload)))
 
     def wait(self, predicate, timeout=5.):
@@ -95,13 +100,31 @@ class LaneMissionTest(unittest.TestCase):
         return handle.get_result_async()
 
     def test_final_follow_reason_arms_and_finish_stops(self):
+        self.linear_speed = .06
         result = self.goal()
-        self.wait(lambda: 'LANE' in self.modes)
+        self.wait(lambda: self.server.guard.values.get('velocity') == (.06, 0.))
         self.finish_pub.publish(Bool(data=True))
         self.wait(result.done)
         self.assertEqual(result.result().status, GoalStatus.STATUS_SUCCEEDED)
         self.assertEqual(result.result().result.code, FollowLane.Result.RESULT_SUCCESS)
         self.wait(lambda: self.modes[-1] == 'STOP')
+
+    def test_old_watchdog_limit_is_rejected_before_arming(self):
+        self.watchdog.set_parameters([Parameter('max_speed_mps', value=.03)])
+        result = self.goal()
+        self.wait(result.done)
+        self.assertEqual(result.result().result.code, FollowLane.Result.RESULT_FAULT)
+        self.assertIn('watchdog_setting_mismatch:max_speed_mps', result.result().result.message)
+        self.assertNotIn('LANE', self.modes)
+        self.assertFalse(self.safety.enabled)
+
+    def test_speed_over_six_cm_aborts_and_releases_permission(self):
+        self.linear_speed = .061
+        result = self.goal()
+        self.wait(result.done)
+        self.assertEqual(result.result().result.code, FollowLane.Result.RESULT_FAULT)
+        self.assertIn('velocity_limit_exceeded', result.result().result.message)
+        self.assertFalse(self.safety.enabled)
 
     def test_sensor_failure_never_arms(self):
         self.reason = 'sensor_failure'
