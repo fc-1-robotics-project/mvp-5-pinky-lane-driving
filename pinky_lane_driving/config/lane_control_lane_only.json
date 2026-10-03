@@ -131,5 +131,6 @@
     "obstacle_stop_margin_m": 0.06
   },
   "crosswalk_control_enabled": false,
+  "lidar_obstacle_stop_enabled": false,
   "recovery_min_path_length_m": 0.06
 }

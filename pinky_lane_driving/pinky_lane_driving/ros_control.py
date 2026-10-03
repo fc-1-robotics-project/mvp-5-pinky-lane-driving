@@ -98,6 +98,7 @@ class ControlNode(Node):
                               CrosswalkTracker(**config['crosswalk']),
                               scan_timeout=self.sensors['scan_timeout_s'],
                               crosswalk_control_enabled=config.get('crosswalk_control_enabled', True),
+                              lidar_obstacle_stop_enabled=config.get('lidar_obstacle_stop_enabled', True),
                               recovery_min_path_length_m=recovery_min_path_length_m)
         self.buffer = Buffer(node=self)
         self.listener = TransformListener(self.buffer, self)
@@ -294,7 +295,11 @@ class ControlNode(Node):
                                           if selected_odom is not None else age(self.odom)),
                               scan_age_s=(now - stamp_seconds(selected_scan)
                                           if selected_scan is not None else age(self.scan)),
-                              scan_coverage_ok=coverage, scan_hit=hit, emergency=emergency)
+                              scan_coverage_ok=coverage,
+                              scan_hit=self.core.obstacle_for_stop(hit),
+                              raw_scan_hit=hit,
+                              lidar_obstacle_stop_enabled=self.core.lidar_obstacle_stop_enabled,
+                              emergency=emergency)
             diagnostic['tf_odom_rewind_s'] = (stamp_seconds(self.odom[0]) - stamp_seconds(selected_odom)
                                               if self.odom and selected_odom is not None else None)
             diagnostic['tf_scan_rewind_s'] = (stamp_seconds(self.scan[0]) - stamp_seconds(selected_scan)

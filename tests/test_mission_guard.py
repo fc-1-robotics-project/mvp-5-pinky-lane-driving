@@ -34,6 +34,16 @@ class MissionGuardTest(unittest.TestCase):
         g.values['diagnostic']['scan_hit']=True
         self.assertFalse(g.readiness(1.)[0])
 
+    def test_disabled_obstacle_stop_is_visible_but_unknown_still_blocks(self):
+        g = self.ready()
+        g.values['diagnostic'].update(lidar_obstacle_stop_enabled=False,
+                                     raw_scan_hit=True, scan_hit=False)
+        ready, reason = g.readiness(1.)
+        self.assertTrue(ready)
+        self.assertIn('라이다 장애물 정지 OFF', reason)
+        g.values['diagnostic']['scan_hit'] = None
+        self.assertFalse(g.readiness(1.)[0])
+
     def test_hold_does_not_become_persistent_stop(self):
         g=self.ready()
         for now in range(1,30):

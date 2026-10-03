@@ -56,6 +56,53 @@ class RuntimeTest(unittest.TestCase):
         self.update(1.4, (1,))
         self.assertEqual(self.tick(1.4).speed, 0.)
 
+    def disable_lidar_obstacle_stop(self):
+        self.core = DriveCore(self.core.tracker, self.core.limits,
+                              self.core.behavior.settings, self.core.crosswalks,
+                              scan_timeout=self.core.scan_timeout,
+                              lidar_obstacle_stop_enabled=False)
+
+    def test_disabled_lidar_obstacle_stop_follows_despite_valid_hits(self):
+        self.disable_lidar_obstacle_stop()
+        self.update(1.)
+        self.tick(1., scan_hit=True)
+        for i in range(1, 11):
+            stamp = 1. + i * .06
+            self.update(stamp)
+            result = self.tick(stamp, scan_hit=True)
+            self.assertGreater(result.speed, 0.)
+            self.assertLessEqual(result.speed, self.core.limits.max_speed)
+            self.assertEqual(result.reason, 'follow')
+        self.assertFalse(self.core.obstacle_for_stop(True))
+        self.assertIsNone(self.core.obstacle_for_stop(None))
+
+    def test_disabled_obstacle_stop_preserves_emergency_and_sensor_faults(self):
+        for override in (dict(estop=True), dict(scan_hit=None), dict(scan_age=.3),
+                         dict(coverage_ok=False), dict(pose=None)):
+            with self.subTest(override=override):
+                self.setUp()
+                self.disable_lidar_obstacle_stop()
+                self.update(1.)
+                self.tick(1., scan_hit=True)
+                self.assertGreater(self.tick(1.06, scan_hit=True).speed, 0.)
+                self.assertEqual(self.tick(1.07, **override).speed, 0.)
+        self.setUp()
+        self.disable_lidar_obstacle_stop()
+        self.update(1.)
+        self.tick(1.)
+        self.assertEqual(self.tick(1.4, scan_hit=True).speed, 0.)
+        self.core.observe({}, now=1.5, pose=(0.,0.,0.))
+        self.assertEqual(self.tick(1.5, scan_hit=True).speed, 0.)
+
+    def test_lidar_obstacle_stop_defaults_on_and_requires_boolean(self):
+        self.assertTrue(self.core.lidar_obstacle_stop_enabled)
+        self.assertTrue(self.core.obstacle_for_stop(True))
+        for value in (0, 1, None, 'false'):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'lidar_obstacle_stop_enabled'):
+                DriveCore(self.core.tracker, self.core.limits, self.core.behavior.settings,
+                          self.core.crosswalks, scan_timeout=self.core.scan_timeout,
+                          lidar_obstacle_stop_enabled=value)
+
     def test_continuous_fresh_single_boundary_moves_beyond_last_pair_timeout(self):
         self.update(1.)
         self.tick(1.)

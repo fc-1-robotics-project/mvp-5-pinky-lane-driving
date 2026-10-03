@@ -13,11 +13,14 @@ from .tracking import relative_pose
 
 class DriveCore:
     def __init__(self, tracker, limits, behavior_settings, crosswalk_tracker, *, scan_timeout,
-                 crosswalk_control_enabled=True, recovery_min_path_length_m=None):
+                 crosswalk_control_enabled=True, recovery_min_path_length_m=None,
+                 lidar_obstacle_stop_enabled=True):
         if not math.isfinite(scan_timeout) or scan_timeout <= 0:
             raise ValueError('Scan timeout must be finite and positive')
         if type(crosswalk_control_enabled) is not bool:
             raise ValueError('crosswalk_control_enabled must be a boolean')
+        if type(lidar_obstacle_stop_enabled) is not bool:
+            raise ValueError('lidar_obstacle_stop_enabled must be a boolean')
         if recovery_min_path_length_m is None:
             recovery_min_path_length_m = limits.stop_margin
         if (isinstance(recovery_min_path_length_m, bool)
@@ -31,6 +34,7 @@ class DriveCore:
         self.behavior = Behavior(behavior_settings)
         self.crosswalks = crosswalk_tracker
         self.crosswalk_control_enabled = crosswalk_control_enabled
+        self.lidar_obstacle_stop_enabled = lidar_obstacle_stop_enabled
         self.scan_timeout = scan_timeout
         self.lane = LanePath()
         self.polygons = ()
@@ -38,6 +42,16 @@ class DriveCore:
         self.capture_stamp = None
         self.last_tick = None
         self.previous_speed = 0.
+
+    def obstacle_for_stop(self, raw_hit):
+        """Operator may disable object-triggered stops; unknown stays unknown.
+
+        Scan freshness/coverage, odometry, camera, central permit, emergency
+        stop and the independent output watchdog remain separate requirements.
+        """
+        if type(raw_hit) is bool and not self.lidar_obstacle_stop_enabled:
+            return False
+        return raw_hit
 
     def observe(self, observation, *, now, pose):
         """Called on completed inference; pose is odom_from_base at capture time."""
@@ -82,7 +96,7 @@ class DriveCore:
                     polygons = [transform_points(p, transform) for p in self.polygons]
                     event, passed = self.crosswalks.update(polygons, current_path, pose)
             decision = self.behavior.step(now, sensors_ok=valid, estop=estop,
-                                          obstacle=scan_hit if valid else None,
+                                          obstacle=self.obstacle_for_stop(scan_hit) if valid else None,
                                           crosswalk=event, passed_id=passed,
                                           measured_speed=measured_speed)
             requested = decision.speed_limit

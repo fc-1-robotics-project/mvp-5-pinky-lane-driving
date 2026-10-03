@@ -71,6 +71,8 @@ class MissionGuard:
             return False, d.get('lane_reason', 'lane_not_ready')
         if d.get('scan_hit') is not False:
             return False, 'obstacle_or_unknown'
+        if d.get('lidar_obstacle_stop_enabled') is False:
+            return True, '준비 완료 · 라이다 장애물 정지 OFF'
         return True, 'ready'
 
     def sustained(self, key, condition, now, seconds):

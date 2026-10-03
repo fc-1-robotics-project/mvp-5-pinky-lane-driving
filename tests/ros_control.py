@@ -141,6 +141,29 @@ class RosControlTest(unittest.TestCase):
         self.assertEqual(diagnostic['obstacle_stop_margin_m'], .06)
         self.assertEqual(diagnostic['recovery_min_path_length_m'], .06)
 
+    def test_configured_obstacle_stop_disabled_is_visible_and_preserves_estop(self):
+        config = copy.deepcopy(self.config)
+        config['lidar_obstacle_stop_enabled'] = False
+        node = ControlNode(config=config, namespace=f'/disabled_stop_{os.getpid()}')
+        try:
+            self.assertFalse(node.core.lidar_obstacle_stop_enabled)
+        finally:
+            node.destroy_node()
+        self.controller.core.lidar_obstacle_stop_enabled = False
+        self.scan_overrides[180] = .1
+        self.wait(lambda: any(d.get('raw_scan_hit') is True
+                             and d['scan_hit'] is False for d in self.diagnostics))
+        self.messages.clear()
+        self.wait(lambda: any(m.linear.x > 0 for m in self.messages))
+        self.assertFalse(self.diagnostics[-1]['lidar_obstacle_stop_enabled'])
+        self.emergency = True
+        self.wait(lambda: self.diagnostics[-1]['emergency'] is True
+                  and self.messages[-1].linear.x == 0.)
+        self.emergency = False
+        self.send_scan = False
+        self.wait(lambda: self.diagnostics[-1].get('fault') == 'Scan unavailable or stale'
+                  and self.messages[-1].linear.x == 0.)
+
     def test_valid_command_checks_forward_stop_and_command_arc(self):
         self.wait(lambda: any(m.linear.x > 0 for m in self.messages))
         self.controller.timer.cancel()
