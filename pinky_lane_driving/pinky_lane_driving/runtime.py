@@ -6,6 +6,7 @@ import math
 
 from .behavior import Behavior, arbitrate
 from .control import Proposal, command
+from .crosswalk import outline
 from .obstacles import transform_points
 from .path import LanePath
 from .tracking import relative_pose
@@ -67,8 +68,10 @@ class DriveCore:
                 return
             polygons = ()
             if self.crosswalk_control_enabled:
-                polygons = tuple(polygon for d in observation['detections'] if d['class_id'] == 0
-                                 if (polygon := self.tracker.calibration.project_visible_polygon(d['polygon_px'])))
+                # tick() tests every vertex against the path at 20 Hz.
+                polygons = tuple(hull for d in observation['detections'] if d['class_id'] == 0
+                                 if len(hull := outline(
+                                     self.tracker.calibration.project_visible_polygon(d['polygon_px']))) >= 3)
             self.lane, self.polygons = lane, polygons
             self.capture_pose, self.capture_stamp = pose, observation['capture_time_s']
         except (KeyError, ValueError, TypeError, IndexError):

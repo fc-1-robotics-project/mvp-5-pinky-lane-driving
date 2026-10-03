@@ -4,7 +4,7 @@
 
 import math
 
-from .obstacles import point_segment_distance, transform_points
+from .obstacles import convex_hull, point_segment_distance, transform_points
 from .path import cross
 from .tracking import relative_pose
 
@@ -19,6 +19,24 @@ def inside(point, polygon):
             if x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]:
                 hit = not hit
     return hit
+
+
+def outline(points):
+    """Convex hull on a 1 cm grid: a bounded, conservative crosswalk outline.
+
+    Mask contours carry hundreds of vertices, the control timer re-projects
+    each observation at every tick and every new detection jitters. An exact
+    point set therefore grew without bound and starved the 20 Hz loop.
+    Passage and overlap only need the outer extent; filling a concave notch
+    can only make the robot treat the crosswalk as slightly nearer.
+    """
+    cells = {(round(x, 2), round(y, 2)) for x, y in points}
+    return convex_hull(cells) or tuple(cells)
+
+
+def center(points):
+    """Bounding-box centre: independent of how densely the outline is sampled."""
+    return tuple((min(p[i] for p in points) + max(p[i] for p in points)) / 2 for i in (0, 1))
 
 
 def path_interval(polygon, path):
@@ -99,16 +117,13 @@ class CrosswalkTracker:
                 break
             end = max(end, last)
             grouped.extend(polygon)
-        world = transform_points(grouped, pose)
+        world = outline(transform_points(grouped, pose))
         if self.active_id is not None:
-            center = tuple(sum(p[i] for p in world) / len(world) for i in (0, 1))
-            previous = tuple(sum(p[i] for p in self.world_points) / len(self.world_points)
-                             for i in (0, 1))
-            if math.dist(center, previous) > self.association_distance:
+            if math.dist(center(world), center(self.world_points)) > self.association_distance:
                 return None, self.passed_id
             # Preserve farthest observed extent so partial stripe loss cannot
-            # shorten passage evidence. Unique points bound duplicate growth.
-            self.world_points = tuple(set(self.world_points + world))
+            # shorten passage evidence.
+            self.world_points = outline(self.world_points + world)
         else:
             self.serial += 1
             self.active_id = f'crosswalk-{self.serial}'
