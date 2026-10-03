@@ -3,6 +3,7 @@
 """Local operator motion latch; starts and fails in the stopped state."""
 
 import math
+import time
 
 import rclpy
 from rcl_interfaces.msg import ParameterDescriptor
@@ -27,6 +28,12 @@ class SafetyNode(Node):
         ).value
         if type(start_enabled) is not bool:
             raise ValueError('start_enabled must be boolean')
+        self.enable_timeout = self.declare_parameter(
+            'enable_timeout_s', 1.0, ParameterDescriptor(read_only=True)
+        ).value
+        if not math.isfinite(self.enable_timeout) or self.enable_timeout <= 0:
+            raise ValueError('enable_timeout_s must be finite and positive')
+        self.enabled_until = time.monotonic() + self.enable_timeout
         self.enabled = start_enabled
         self.publisher = self.create_publisher(Bool, 'lane/estop', 1)
         self.service = self.create_service(
@@ -44,18 +51,22 @@ class SafetyNode(Node):
 
     def set_enabled(self, request, response):
         self.enabled = request.data is True
+        self.enabled_until = time.monotonic() + self.enable_timeout
         self.publish()
         response.success = True
         response.message = (
             'lane motion enabled' if self.enabled else 'lane motion stopped'
         )
         if self.enabled:
-            self.get_logger().warning('Lane motion ENABLED by local operator')
+            self.get_logger().debug('Lane permission lease renewed')
         else:
             self.get_logger().warning('Lane motion stopped by local operator')
         return response
 
     def publish(self):
+        if self.enabled and time.monotonic() >= self.enabled_until:
+            self.enabled = False
+            self.get_logger().warning('Lane permission lease expired')
         self.publisher.publish(Bool(data=not self.enabled))
 
     def stop(self):

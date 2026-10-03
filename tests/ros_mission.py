@@ -10,6 +10,10 @@ import rclpy
 from rclpy.action import ActionClient
 from rclpy.executors import MultiThreadedExecutor
 from std_msgs.msg import Bool, String
+from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
+from pinky_interfaces.msg import RobotHeartbeat
+from pinky_lane_driving.ros_safety import SafetyNode
 
 from pinky_lane_driving.lane_mission_server import LaneMissionServer
 
@@ -19,7 +23,13 @@ class LaneMissionTest(unittest.TestCase):
         rclpy.init()
         self.server = LaneMissionServer()
         self.probe = rclpy.create_node('lane_mission_test_probe')
-        self.executor = MultiThreadedExecutor(num_threads=3)
+        self.safety = SafetyNode()
+        self.watchdog = rclpy.create_node('lane_watchdog')
+        for key, value in LaneMissionServer.WATCHDOG.items():
+            self.watchdog.declare_parameter(key, value)
+        self.executor = MultiThreadedExecutor(num_threads=6)
+        self.executor.add_node(self.safety)
+        self.executor.add_node(self.watchdog)
         self.executor.add_node(self.server)
         self.executor.add_node(self.probe)
         self.reason = 'follow'
@@ -27,39 +37,61 @@ class LaneMissionTest(unittest.TestCase):
         self.command_pub = self.probe.create_publisher(String, 'lane/command', 10)
         self.finish_pub = self.probe.create_publisher(Bool, 'lane/finish', 10)
         self.modes = []
+        self.live_mode = 'STOP'
+        self.permit = True
+        self.diagnostic_pub = self.probe.create_publisher(String, 'lane/diagnostics', 10)
+        self.mode_pub = self.probe.create_publisher(String, 'drive/mode_status', 10)
+        self.cmd_pub = self.probe.create_publisher(Twist, 'cmd_vel', 10)
+        self.odom_pub = self.probe.create_publisher(Odometry, 'odom', 10)
+        self.gate_pub = self.probe.create_publisher(RobotHeartbeat, 'fleet/heartbeat', 10)
         self.mode_sub = self.probe.create_subscription(
-            String, 'drive/mode_request', lambda msg: self.modes.append(msg.data), 10)
+            String, 'drive/mode_request', self.mode_request, 10)
         self.timer = self.probe.create_timer(.03, self.publish)
         self.client = ActionClient(self.probe, FollowLane, 'follow_lane')
-        self.wait(self.client.server_is_ready)
+        self.wait(lambda: self.client.server_is_ready() and self.server.local.service_is_ready()
+                  and self.server.safety.service_is_ready() and self.server.watchdog.service_is_ready())
 
     def tearDown(self):
         self.executor.shutdown()
         self.client.destroy()
         self.server.destroy_node()
+        self.safety.destroy_node()
+        self.watchdog.destroy_node()
         self.probe.destroy_node()
         rclpy.shutdown()
 
+    def mode_request(self, message):
+        self.modes.append(message.data)
+        self.live_mode = message.data
+
     def publish(self):
+        self.mode_pub.publish(String(data=json.dumps(dict(mode=self.live_mode))))
+        self.cmd_pub.publish(Twist())
+        self.odom_pub.publish(Odometry())
+        self.gate_pub.publish(RobotHeartbeat(permit_fresh=self.permit, gate_mode=1))
+        self.diagnostic_pub.publish(String(data=json.dumps(dict(lane_valid=True,
+            lane_reason='paired', scan_hit=False, scan_coverage_ok=True,
+            capture_age_s=.1, scan_age_s=.1, odom_age_s=.1))))
         if self.send_commands:
             payload = dict(reason=self.reason, capture_stamp=time.time(), speed=.03, omega=0.)
             self.command_pub.publish(String(data=json.dumps(payload)))
 
-    def wait(self, predicate, timeout=3.):
+    def wait(self, predicate, timeout=5.):
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             self.executor.spin_once(timeout_sec=.01)
             if predicate():
                 return
-        self.fail('Lane mission condition timed out')
+        self.fail(f'Lane mission timed out: {self.server.state}: {self.server.detail}; values={self.server.guard.values}')
 
-    def goal(self, detection_timeout=1.):
+    def goal(self, detection_timeout=2.):
         goal = FollowLane.Goal(mission_id='test', route_id='right_lane',
-                               detection_timeout_sec=detection_timeout, max_duration_sec=2.)
+                               detection_timeout_sec=detection_timeout, max_duration_sec=5.)
         future = self.client.send_goal_async(goal)
         self.wait(future.done)
         handle = future.result()
         self.assertTrue(handle.accepted)
+        self.handle = handle
         return handle.get_result_async()
 
     def test_final_follow_reason_arms_and_finish_stops(self):
@@ -75,7 +107,7 @@ class LaneMissionTest(unittest.TestCase):
         self.reason = 'sensor_failure'
         result = self.goal(detection_timeout=.2)
         self.wait(result.done)
-        self.assertEqual(result.result().result.code, FollowLane.Result.RESULT_LANE_NOT_READY)
+        self.assertEqual(result.result().result.code, FollowLane.Result.RESULT_LANE_NOT_READY, result.result().result.message)
         self.assertNotIn('LANE', self.modes)
 
     def test_stale_ready_streak_never_arms(self):
@@ -84,5 +116,39 @@ class LaneMissionTest(unittest.TestCase):
         self.wait(lambda: time.monotonic() - self.server.last_command_received > .6)
         result = self.goal(detection_timeout=.2)
         self.wait(result.done)
-        self.assertEqual(result.result().result.code, FollowLane.Result.RESULT_LANE_NOT_READY)
+        self.assertEqual(result.result().result.code, FollowLane.Result.RESULT_LANE_NOT_READY, result.result().result.message)
         self.assertNotIn('LANE', self.modes)
+
+
+    def test_cancel_releases_local_permission(self):
+        result = self.goal()
+        self.wait(lambda: 'LANE' in self.modes)
+        self.handle.cancel_goal_async()
+        self.wait(result.done)
+        self.assertFalse(self.safety.enabled)
+        self.assertEqual(result.result().status, GoalStatus.STATUS_CANCELED)
+        self.assertTrue(self.server.cleanup_ok)
+
+    def test_connection_loss_aborts_and_releases_permission(self):
+        result = self.goal()
+        self.wait(lambda: 'LANE' in self.modes)
+        self.permit = False
+        self.wait(result.done)
+        self.assertFalse(self.safety.enabled)
+        self.assertEqual(result.result().result.code, FollowLane.Result.RESULT_FAULT)
+        self.assertTrue(self.server.cleanup_ok)
+
+    def test_two_runs_can_finish_without_restarting_launch(self):
+        first = self.goal()
+        self.wait(lambda: self.live_mode == 'LANE')
+        self.finish_pub.publish(Bool(data=True))
+        self.wait(first.done)
+        self.assertFalse(self.safety.enabled)
+        self.finish_pub.publish(Bool(data=False))
+        self.wait(lambda: not self.server.finish_high)
+        second = self.goal()
+        self.wait(lambda: self.live_mode == 'LANE')
+        self.finish_pub.publish(Bool(data=True))
+        self.wait(second.done)
+        self.assertEqual(second.result().status, GoalStatus.STATUS_SUCCEEDED)
+        self.assertFalse(self.safety.enabled)

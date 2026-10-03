@@ -57,5 +57,11 @@ class RosSafetyTest(unittest.TestCase):
         self.spin_until(lambda: self.messages[-1] is True)
 
 
+    def test_permission_lease_expires_without_refresh(self):
+        self.set_enabled(True)
+        self.spin_until(lambda: self.safety.enabled is False, timeout=2.)
+        self.spin_until(lambda: self.messages[-1] is True)
+
+
 if __name__ == '__main__':
     unittest.main()

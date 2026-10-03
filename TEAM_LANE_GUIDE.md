@@ -4,14 +4,14 @@
 
 | 항목 | 값 |
 |---|---|
-| 기준 | 2026-10-01 현장 적용 코드 |
-| 로봇 저장소 / 브랜치 | `jsh0116/pinky-lane-driving` / `codex/lane-field-20261001` |
-| 관제 저장소 / 브랜치 | `INYUP-BAEK/pinky-fleet-control` / `codex/lane-field-20261001` |
+| 기준 | 2026-10-01 차선 알고리즘 + 2026-10-03 UI 통합 |
+| 로봇 저장소 / 브랜치 | `jsh0116/pinky-lane-driving` / `codex/nav2-lane-ui-20261003` |
+| 관제 저장소 / 브랜치 | `INYUP-BAEK/pinky-fleet-control` / `codex/nav2-lane-ui-20261003` |
 | 환경 | ROS 2 Jazzy, Python 3.12; 시험 로봇은 aarch64 Raspberry Pi |
-| 이번 실행 모드 | 차선만 시험, Nav2 꺼짐, 횡단보도 정지 꺼짐 |
+| 이번 실행 모드 | Nav2 연속 임무·차선 단독 시험, 횡단보도 정지 꺼짐 |
 | 기본 식별자 | robot1 / 로봇 domain 21 / 관제 PC domain 22 |
 
-관제 설치·실행은 [관제 가이드](https://github.com/INYUP-BAEK/pinky-fleet-control/blob/codex/lane-field-20261001/TEAM_LANE_GUIDE.md)를 따릅니다. 기존 README의 기본 설정보다 **이 브랜치 시험에는 이 문서를 우선**합니다.
+관제 설치·실행은 [관제 가이드](https://github.com/INYUP-BAEK/pinky-fleet-control/blob/codex/nav2-lane-ui-20261003/TEAM_LANE_GUIDE.md)를 따릅니다. 기존 README의 기본 설정보다 **이 브랜치 시험에는 이 문서를 우선**합니다.
 
 ## 1. 설치 전 준비
 
@@ -33,7 +33,7 @@ sudo apt install git python3-colcon-common-extensions python3-rosdep \
   python3-venv python3-pip libcamera-dev
 source /opt/ros/jazzy/setup.bash
 mkdir -p ~/pinky_robot_ws/src
-git clone --branch codex/lane-field-20261001 \
+git clone --branch codex/nav2-lane-ui-20261003 \
   https://github.com/jsh0116/pinky-lane-driving.git \
   ~/pinky_robot_ws/src/pinky-lane-driving
 ```
@@ -151,59 +151,19 @@ ros2 run pinky_lane_driving lane_calibrate_ground \
 
 위 명령은 설정 전체를 생성합니다. 생성된 제어값을 그대로 사용하지 말고, `new_calibrated.json`의 `calibration`·`mounting_id`와 실측 차선 폭을 시험용 JSON에 반영한 뒤 이 문서의 **0.03m/s 제한과 현재 튜닝값을 유지**합니다. 새 카메라 intrinsic 파일은 저장소의 `pinky_camera.yaml`에도 적용해 재빌드합니다. 차체 polygon/TF/라이다 높이도 실물과 맞춥니다. 기존 장비에서 벽 간격 2cm로 시험했다는 사실은 다른 기체의 안전 간격을 보증하지 않습니다.
 
-## 3. 로봇 실행 — 아직 출발하지 않음
+## 3. 로봇·관제 실행과 운용
 
-로봇 터미널 A에서 실행하고 켜둡니다. `lane_start_enabled:=false`를 유지합니다.
+이 브랜치부터 로컬 주행 허가는 임무 서버가 1초마다 만료되기 전에 갱신합니다. 기존 별도 시험 시작/감시 스크립트를 사용하지 않습니다. **[UI_INTEGRATION.md](UI_INTEGRATION.md)**의 통합 launch 및 UI 운용 절차를 사용하세요.
 
-```bash
-source /opt/ros/jazzy/setup.bash
-source ~/camera_ws/install/setup.bash
-source ~/pinky_robot_ws/install/setup.bash
-export ROS_DOMAIN_ID=21
-export LD_LIBRARY_PATH="/usr/local/lib/aarch64-linux-gnu:${LD_LIBRARY_PATH:-}"
-# 앞서 venv로 추론 환경을 설치한 경우에만:
-# export PYTHONPATH="$HOME/pinky_inference/lib/python3.12/site-packages:${PYTHONPATH:-}"
-ros2 launch pinky_robot_system robot_system.launch.py \
-  robot_id:=robot1 \
-  start_motors:=true start_battery:=false start_lane_control:=true \
-  lane_control_config:="$HOME/pinky_calibration/lane_control_lane_only.json" \
-  lane_dry_run:=false hardware_watchdog_confirmed:=true \
-  start_nav2:=false lane_start_enabled:=false \
-  perception_imgsz:=448
-```
+설치 직후 정지 진단이 별도로 필요하면 `tools/field_test/pinky_stationary_probe.py`를 로봇에서 실행할 수 있습니다. 정상 운용의 준비 검사·감시는 임무 서버가 담당합니다.
 
-`hardware_watchdog_confirmed:=true`는 모터 통신 상실 시 정지를 실제 확인한 장비에서만 설정합니다. 새 기체는 바퀴를 띄운 상태에서 모터 명령 timeout/비상정지를 먼저 확인하세요. 이 launch는 모터 드라이버를 시작하므로 현장 작업자가 준비된 상태에서 실행합니다. 이번 차선 단독 시험에서는 지도 인수가 필요 없습니다. Nav2를 켤 때는 해당 환경의 YAML+PGM 지도와 초기 위치 설정이 별도로 필요합니다.
-
-### 로봇 터미널 B: 정지 상태 20초 점검
-
-카메라 원본은 로봇 안에서만 구독하고 PC로 전송하지 않습니다.
-
-```bash
-source /opt/ros/jazzy/setup.bash
-source ~/pinky_robot_ws/install/setup.bash
-export ROS_DOMAIN_ID=21
-python3 ~/pinky_robot_ws/src/pinky-lane-driving/tools/field_test/pinky_stationary_probe.py
-```
-
-출력에서 카메라 640×480, scan/odom/차선 진단 수신, `STOP`, cmd_vel 0, 로컬 estop=true, 유효 경로와 라이다 장애물 없음, watchdog 0.03m/s·0.2s·1.1s를 확인합니다. 이 probe는 관측 결과를 출력하는 도구이고 종료 코드 0이 모든 출발 조건 통과를 뜻하지 않습니다. 최종 시작 스크립트가 신선한 진단을 다시 검사합니다.
-
-## 4. 관제 PC에서 시작·종료
-
-1. [관제 가이드](https://github.com/INYUP-BAEK/pinky-fleet-control/blob/codex/lane-field-20261001/TEAM_LANE_GUIDE.md)에 따라 bridge와 UI를 각각 하나 실행합니다.
-2. 감시기를 먼저 실행합니다. 로봇 배치·빈 코스·전원·현장 감시·즉시 비상정지 가능 여부를 확인합니다.
-3. 관제 PC의 시작 스크립트로 로컬 주행 허가와 중앙 시험 요청을 켭니다.
-4. 출구에서 UI의 **robot1 차선 종료 Bool**을 누릅니다. 감시기 요약의 중앙/로컬 권한 해제 성공, STOP·cmd_vel=0을 확인합니다.
-5. 로봇 launch를 Ctrl+C로 종료합니다. 예전 systemd 방식이 실행 중인 경우 `systemctl --user stop pinky-lane-test.service`로 종료합니다. PC UI/bridge도 종료합니다.
-
-재시험은 로봇 launch를 완전히 종료한 후 다시 시작합니다. 종료 Bool 상태가 남아 있는 세션에서 허가만 반복해서 켜지 마세요.
-
-## 5. 현재 검증 범위와 점검할 현상
+## 4. 현재 검증 범위와 점검할 현상
 
 - 10cm 최소 추종 거리에서 사용자가 회전 안쪽 선 밟음 감소·중앙 주행 개선을 확인했습니다.
 - 짧은 반대쪽 마스크로 경로가 소실되는 문제와 차체→경로 시작점의 인위적인 대각선 충돌 판정을 수정했습니다. 전방 정지 거리와 실제 명령 회전 궤적의 장애물 검사는 유지됩니다.
 - 수정 단계별로 약 3.55m, 0.20m, 0.16m를 주행했습니다. 마지막 구간은 사용자의 종료 Bool로 끝났으며 **최종 코드로 전체 곡선 코스를 연속 완주한 검증은 아닙니다.** 사용자는 끝단을 직선으로 연장할 계획입니다.
 - 다른 로봇·다른 카메라 보정·다른 벽 간격에서의 주행은 미검증입니다. `single_boundary`, `recent_path_no_boundaries`, `no_current_lane`, `lane_observation_stale`와 실제 움직임을 비교합니다.
-- 카메라 영상/rosbag을 자동 저장하는 기능은 추가하지 않았습니다. 기존 감시기는 텍스트 상태·거리·종료 원인만 출력합니다.
+- 카메라 영상/rosbag을 자동 저장하는 기능은 추가하지 않았습니다. 통합 임무 서버는 작은 상태 메시지로 거리·종료 원인을 전달합니다.
 
 하드웨어 없는 검사:
 
@@ -218,4 +178,4 @@ cd ~/pinky_robot_ws/src/pinky-lane-driving
 
 ### 공유 브랜치 포장 시 검증
 
-현재 PC에서 로봇 의존 패키지 9개 빌드, 순수 알고리즘 테스트 128개, 격리 domain 177의 ROS 제어 테스트 12개를 통과했습니다. 패키지 검사 최종 집계는 오류/실패 0개이며 기존 skip 1개가 있습니다. XML 검사는 외부 ROS 스키마 서버 접근 오류가 있어 공식 `ros-infrastructure/rep`의 XSD를 로컬 catalog로 연결한 뒤 통과했습니다. 새 로봇에 대한 깨끗한 OS 설치와 실주행은 별도 확인 대상입니다. 모델·현장 영상·rosbag·자격증명은 포함하지 않습니다. tests의 작은 경로 좌표 fixture는 알고리즘 회귀 검증용이며 영상 데이터셋을 포함하지 않습니다.
+현재 PC에서 로봇 의존 패키지 9개 빌드, 순수 알고리즘 테스트 132개를 통과했습니다. 격리 domain 177에서 새 임무 서버 테스트 6개와 로컬 허가 테스트 2개가 통과했습니다. 기존 현장 스냅샷의 ROS 제어 테스트 12개는 이전 공유 작업에서 통과했으며 차선 제어 알고리즘은 이번 통합에서 변경하지 않았습니다. 패키지 검사 최종 집계는 오류/실패 0개이며 기존 skip 1개가 있습니다. XML 검사는 외부 ROS 스키마 서버 접근 오류가 있어 공식 `ros-infrastructure/rep`의 XSD를 로컬 catalog로 연결한 뒤 통과했습니다. 새 로봇에 대한 깨끗한 OS 설치와 실주행은 별도 확인 대상입니다. 모델·현장 영상·rosbag·자격증명은 포함하지 않습니다. tests의 작은 경로 좌표 fixture는 알고리즘 회귀 검증용이며 영상 데이터셋을 포함하지 않습니다.
