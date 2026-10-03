@@ -1,105 +1,106 @@
-# 팀원용 로봇 설치·차선 주행 가이드
+# 새 로봇 설치·기존 로봇 업데이트
 
-**이 브랜치와 관제 저장소의 같은 이름 브랜치를 함께 사용하세요.**
+**로봇과 관제 PC 모두 `codex/lane-field-20261001` 브랜치로 설치합니다.**
 
-| 항목 | 값 |
+- 로봇: [jsh0116/pinky-lane-driving](https://github.com/jsh0116/pinky-lane-driving/tree/codex/lane-field-20261001)
+- 관제: [INYUP-BAEK/pinky-fleet-control](https://github.com/INYUP-BAEK/pinky-fleet-control/blob/codex/lane-field-20261001/TEAM_LANE_GUIDE.md)
+- 설치 후 실행·UI 사용·종료: [UI_INTEGRATION.md](UI_INTEGRATION.md)
+
+## 1. 준비할 장비·파일
+
+| 구분 | 준비 내용 |
 |---|---|
-| 기준 | 2026-10-01 차선 알고리즘 + 2026-10-03 UI 통합 |
-| 로봇 저장소 / 브랜치 | `jsh0116/pinky-lane-driving` / `codex/nav2-lane-ui-20261003` |
-| 관제 저장소 / 브랜치 | `INYUP-BAEK/pinky-fleet-control` / `codex/nav2-lane-ui-20261003` |
-| 환경 | ROS 2 Jazzy, Python 3.12; 시험 로봇은 aarch64 Raspberry Pi |
-| 이번 실행 모드 | Nav2 연속 임무·차선 단독 시험, 횡단보도 정지 꺼짐 |
-| 기본 식별자 | robot1 / 로봇 domain 21 / 관제 PC domain 22 |
+| OS / ROS | Ubuntu 24.04 / ROS 2 Jazzy / 시스템 Python 3.12. 기준 로봇은 Ubuntu 24.04.4 aarch64 Raspberry Pi |
+| 하드웨어 | Pinky 모터·펌웨어·UART·라이다·카메라가 동작하는 기본 이미지. 이 저장소는 OS/펌웨어 설치 이미지가 아님 |
+| 지도 | 현장 Nav2 YAML **및 YAML의 `image:`가 가리키는 PGM/PNG** |
+| 모델 | 팀에서 별도 전달받은 `best.pt` (아래 해시 확인) |
+| 보정 | 새 기체의 카메라 intrinsic·지면 변환·장착 TF·차선 폭·차체 크기 |
 
-관제 설치·실행은 [관제 가이드](https://github.com/INYUP-BAEK/pinky-fleet-control/blob/codex/nav2-lane-ui-20261003/TEAM_LANE_GUIDE.md)를 따릅니다. 기존 README의 기본 설정보다 **이 브랜치 시험에는 이 문서를 우선**합니다.
+ROS가 없으면 먼저 [ROS Jazzy 공식 Ubuntu 설치 안내](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)를 따릅니다. ROS 저장소가 등록된 뒤 로봇은 `ros-jazzy-ros-base`로 시작할 수 있고, 아래 rosdep으로 필요한 실행 패키지를 설치합니다.
 
-## 1. 설치 전 준비
+현재 공유 프로필은 **차선 속도 0.06m/s, 횡단보도 정지 OFF, 차선의 라이다 물체 자동 정지 OFF**입니다. 0.06m/s 실제 주행은 미검증이며 새 기체도 현장 점검이 필요합니다. 차선 외 Nav2 속도/장애물 설정은 `pinky_navigation/params/nav2_params.yaml`의 별도 설정입니다.
 
-이 문서는 ROS Jazzy와 Pinky의 하드웨어 구성이 준비된 로봇에 적용합니다. 공장 초기 OS에 UART·카메라 드라이버·모터 펌웨어까지 설치하는 이미지는 포함하지 않습니다.
+기준 하드웨어는 모터 `/dev/ttyAMA4`, C1 라이다 `/dev/ttyAMA0`, OV5647 카메라 640×480·orientation 180입니다. `ls -l /dev/ttyAMA{0,4}`와 `id`로 포트·접근 그룹을 확인합니다. 포트가 다르면 `pinky_bringup/config/pinky_params.yaml`과 `pinky_bringup/launch/bringup_robot.launch.xml`을 실제 장비에 맞춥니다. 기구 치수/TF는 `pinky_description`도 함께 확인합니다.
 
-- 모터: `/dev/ttyAMA4`, 라이다 C1: `/dev/ttyAMA0`. 다른 하드웨어에서는 실제 포트와 전원·UART 설정을 먼저 맞춥니다. 접근 권한은 `ls -l /dev/ttyAMA{0,4}`와 `id`로 확인합니다.
-- 현재 카메라: OV5647, 640×480, orientation 180. YOLO 입력은 **448**입니다.
-- 카메라/차체 장착·차선 폭·차체 크기가 달라지면 아래 보정을 다시 합니다. 현재 차선 폭은 0.17m입니다.
-- 같은 네트워크에 domain 21을 쓰는 기존 로봇이 동시에 있으면 이 예제 설정으로 시작하지 않습니다. 다른 기체 한 대에 같은 robot1 프로필을 재사용하는 절차입니다.
-- 기존 bringup, UI, bridge를 종료한 뒤 진행합니다. 한 기체에 bringup을 중복 실행하지 않습니다.
+## 2. 소스 받기
 
-### 로봇 저장소 설치
-
-새 워크스페이스에서 실행합니다. 이미 같은 패키지가 `src`에 있으면 중복 clone하지 마세요.
+같은 이름의 ROS 패키지가 이미 `src`에 있으면 중복 clone하지 말고 7절 업데이트 절차를 사용합니다. **로봇에는 로봇 저장소만**, 관제에는 관제 저장소를 설치합니다. 둘을 한 workspace에 clone하면 `pinky_interfaces`가 중복됩니다.
 
 ```bash
 sudo apt update
 sudo apt install git python3-colcon-common-extensions python3-rosdep \
-  python3-venv python3-pip libcamera-dev
+  python3-venv python3-pip python3-pytest libcamera-dev
 source /opt/ros/jazzy/setup.bash
 mkdir -p ~/pinky_robot_ws/src
-git clone --branch codex/nav2-lane-ui-20261003 \
+git clone --branch codex/lane-field-20261001 \
   https://github.com/jsh0116/pinky-lane-driving.git \
   ~/pinky_robot_ws/src/pinky-lane-driving
+# 처음 사용하는 장비에서만, rosdep이 초기화되지 않았다면 실행:
+# sudo rosdep init
+rosdep update
 ```
 
-권한이 필요한 저장소는 GitHub 계정의 읽기 권한과 인증이 있어야 clone할 수 있습니다. SSH 개인키·토큰은 공유하지 않습니다.
+## 3. 카메라 및 추론 환경
 
-### 카메라 드라이버 설치
+### camera_ros
 
-기존 시험 로봇은 별도 `camera_ws`의 다음 소스를 사용했습니다.
+이미 `~/camera_ws`에서 카메라가 정상 동작하면 그 구성을 사용합니다. 새 설치의 기준 커밋은 현재 로봇에서 확인한 `8f792e27a6dbc81e4943a75765fc1b7b7d37b301`입니다.
 
 ```bash
 mkdir -p ~/camera_ws/src
 git clone https://github.com/christianrauch/camera_ros.git ~/camera_ws/src/camera_ros
 git -C ~/camera_ws/src/camera_ros checkout 8f792e27a6dbc81e4943a75765fc1b7b7d37b301
 source /opt/ros/jazzy/setup.bash
-# rosdep 초기화가 안 된 장비에서만: sudo rosdep init
-rosdep update
 rosdep install --from-paths ~/camera_ws/src --ignore-src -r -y --rosdistro jazzy
 cd ~/camera_ws
 colcon build --symlink-install --packages-select camera_ros
 source ~/camera_ws/install/setup.bash
 ```
 
-시험 장비는 `/usr/local/lib/aarch64-linux-gnu`의 **libcamera 0.3.2**를 사용했습니다. 위 apt의 libcamera만으로 다른 이미지에서 OV5647이 인식되는지는 별도 확인해야 합니다. 이미 Pinky 카메라 구성이 작동하면 해당 구성을 유지하세요. `camera_ros` 빌드 성공만으로 카메라 동작이 검증되지는 않습니다.
+기준 기체는 `/usr/local/lib/aarch64-linux-gnu`의 libcamera 0.3.2 환경입니다. 새 이미지에서 시스템 libcamera만으로 OV5647이 동작한다는 보장은 없습니다. 이미 별도 libcamera를 설치했다면 rosdep의 해당 의존성을 `--skip-keys libcamera`로 제외하고 사용한 라이브러리와 빌드 경로를 맞춥니다. Raspberry Pi용 libcamera 지원/빌드는 [camera_ros 공식 안내](https://github.com/christianrauch/camera_ros#build-instructions)를 참고합니다. 라이브러리 버전을 바꿨으면 camera_ros도 다시 빌드합니다.
 
-### 추론 환경과 모델
+### 추론 환경
 
-모델은 저장소에 포함하지 않습니다. 팀 내 별도 전달받은 `best.pt`를 **빌드 전에** 아래 위치에 둡니다.
+현재 로봇에서 확인한 버전(2026-10-03):
 
-```bash
-mkdir -p ~/pinky_robot_ws/src/pinky-lane-driving/pinky_lane_driving/models
-# 전달받은 best.pt를 위 models/best.pt 위치로 복사한 후 확인
-sha256sum ~/pinky_robot_ws/src/pinky-lane-driving/pinky_lane_driving/models/best.pt
-```
+| 패키지 | 버전 |
+|---|---|
+| ultralytics | 8.4.148 |
+| torch / torchvision | 2.14.0 / 0.29.0 |
+| numpy | 1.26.4 |
+| opencv-python | 4.10.0.84 |
 
-기준 모델: 6,541,917 bytes, SHA256:
-
-```text
-5a01c38f6744f228b0d3e99c14989386185442de0efaf1235ad9a331950b7ede
-```
-
-현장 확인 버전은 `ultralytics 8.4.148`, `torch 2.14.0`, `numpy 1.26.4`, `opencv-python 4.10.0.84`입니다. 이미 이 조합이 설치되어 있다면 재설치하지 않습니다. 새 장비에서는 ROS의 시스템 Python을 보존하고 다음 격리 환경을 사용할 수 있습니다. 해당 아키텍처의 wheel이 없으면 설치를 중단하고 팀의 검증된 환경을 전달받으세요. 최신 버전으로 임의 대체한 환경은 현장 검증 조합과 다릅니다.
+이미 설치된 기준 로봇에는 재설치할 필요가 없습니다. 새 장비에서는 ROS 시스템 Python을 보존하도록 격리 환경을 사용합니다. 아래 명령은 해당 아키텍처용 wheel이 제공되는 환경이 전제입니다. 설치가 안 되면 임의 최신 버전으로 바꾸지 말고 팀의 검증된 wheel/이미지를 전달받습니다.
 
 ```bash
 /usr/bin/python3 -m venv --system-site-packages ~/pinky_inference
 ~/pinky_inference/bin/python -m pip install \
   'numpy==1.26.4' 'opencv-python==4.10.0.84' \
-  'torch==2.14.0' 'ultralytics==8.4.148'
+  'torch==2.14.0' 'torchvision==0.29.0' 'ultralytics==8.4.148'
 ```
 
-ROS 실행 파일은 시스템 Python을 쓸 수 있으므로 venv 활성화만으로 충분하지 않습니다. 위 방식으로 설치했으면 **아래 실행 터미널에도** 다음을 설정합니다.
+모델은 Git에 포함하지 않습니다. 팀에서 받은 모델을 **로봇 패키지 빌드 전에** `~/pinky_robot_ws/src/pinky-lane-driving/pinky_lane_driving/models/best.pt`로 복사합니다.
 
 ```bash
-export PYTHONPATH="$HOME/pinky_inference/lib/python3.12/site-packages:${PYTHONPATH:-}"
-python3 -c 'import rclpy, torch, cv2, numpy, ultralytics; print(torch.__version__, cv2.__version__, numpy.__version__, ultralytics.__version__)'
+mkdir -p ~/pinky_robot_ws/src/pinky-lane-driving/pinky_lane_driving/models
+# 위 디렉터리에 전달받은 best.pt를 둔 뒤 확인
+sha256sum ~/pinky_robot_ws/src/pinky-lane-driving/pinky_lane_driving/models/best.pt
 ```
 
-640 추론 입력 또는 FP16·INT8·NCNN·ONNX는 이번 공유 버전에 사용하지 않습니다. 640 입력은 기존 모델의 실제 차선 프레임에서 경로 검출에 실패했습니다.
+기준 모델 크기: **6,541,917 bytes**, SHA256:
 
-### 로봇 패키지 빌드
+```text
+5a01c38f6744f228b0d3e99c14989386185442de0efaf1235ad9a331950b7ede
+```
+
+YOLO 입력은 **448**입니다. 같은 모델의 640 입력은 실제 차선 프레임에서 경로 검출에 실패했습니다. FP16/INT8/NCNN/ONNX 비교는 이 브랜치 적용 범위에 포함하지 않습니다.
+
+## 4. 의존성 설치·빌드
 
 ```bash
 source /opt/ros/jazzy/setup.bash
 source ~/camera_ws/install/setup.bash
 cd ~/pinky_robot_ws
-# 전체 Gazebo/부가 패키지 대신 실제 실행에 필요한 경로만 의존성 설치
 rosdep install --from-paths \
   src/pinky-lane-driving/pinky_bringup \
   src/pinky-lane-driving/pinky_description \
@@ -117,30 +118,42 @@ ros2 pkg prefix pinky_robot_system
 ros2 pkg prefix camera_ros
 ```
 
-`camera_ros`는 위에서 소스로 설치했기 때문에 rosdep에서만 제외합니다. 의존성 설치 실패를 무시하고 주행 단계로 넘어가지 마세요. 부가 기능용 `pinky_motion`도 코드에는 포함되지만 차선 단독 시험에는 필요하지 않습니다.
+`camera_ros`는 별도 workspace에서 빌드했으므로 여기의 rosdep에서는 제외합니다. Gazebo/부가 모션 패키지는 통합 실물 실행의 빌드 대상이 아닙니다. 빌드 실패가 있으면 실행 단계로 넘어가지 않습니다.
 
-## 2. 주행 설정 준비
+시스템 Python으로 추론 패키지를 읽을 수 있는지 확인합니다. venv를 썼다면 **매 실행 터미널에도** 이 PYTHONPATH가 필요합니다.
 
 ```bash
-mkdir -p ~/pinky_calibration
-# 대상 파일이 이미 있으면 덮어쓰기 전에 복사본을 보관하세요.
-cp ~/pinky_robot_ws/src/pinky-lane-driving/pinky_lane_driving/config/lane_control_lane_only.json \
+source /opt/ros/jazzy/setup.bash
+source ~/camera_ws/install/setup.bash
+source ~/pinky_robot_ws/install/setup.bash
+export PYTHONPATH="$HOME/pinky_inference/lib/python3.12/site-packages:${PYTHONPATH:-}"
+python3 -c 'import rclpy, torch, cv2, numpy, ultralytics; from pinky_interfaces.action import FollowLane; print(torch.__version__, cv2.__version__, numpy.__version__, ultralytics.__version__)'
+ros2 pkg prefix --share pinky_lane_driving
+```
+
+`best.pt`를 빌드 후 복사했다면 `colcon build --symlink-install --packages-select pinky_lane_driving`을 다시 실행합니다. 설치 경로의 `share/pinky_lane_driving/models/best.pt`가 있어야 기본 launch에서 모델을 찾습니다.
+
+## 5. 지도·기체 보정 준비
+
+### 지도와 차선 프로필
+
+```bash
+mkdir -p ~/pinky_maps ~/pinky_calibration
+# Nav2 YAML은 ~/pinky_maps/site.yaml로 준비합니다.
+# YAML의 image: 항목이 가리키는 PGM/PNG도 해당 경로에 함께 준비합니다.
+# 신규 설치 전용: 기존 운용 파일이 있다면 먼저 백업합니다.
+cp -n ~/pinky_robot_ws/src/pinky-lane-driving/pinky_lane_driving/config/lane_control_lane_only.json \
   ~/pinky_calibration/lane_control_lane_only.json
 ```
 
-| 설정 | 현재 값 / 의미 |
-|---|---|
-| `control.min_lookahead` | 0.10m; 속도 항도 반영되므로 항상 고정 10cm 목표점이라는 뜻은 아님 |
-| `control.steering_gain` | 1.2 |
-| 최대 선속도 / 각속도 | 0.03m/s / 0.6rad/s |
-| 영상 유효 시간 / 명령 timeout | 1.1s / 0.2s |
-| 차선 일시 소실 | 마지막 측정 경로를 odom으로 변환, 최대 1.5s·0.06m·0.03m/s |
-| 제어 정지 여유 / 복귀 최소 경로 길이 | 0.02m / 0.06m; 서로 다른 조건 |
-| 차체 polygon | x: -0.08~0.06m, y: -0.06~0.06m; 추가 padding 0 |
-| 라이다 자체 반사 필터 / 정지 여유 | 0.07m / 0.06m |
-| 횡단보도 | `lane_control_lane_only.json`은 정지 조건 끔; `lane_control.json`은 일반 설정 |
+지도와 모델은 별도 전달 파일입니다. 코드만 clone하면 현장 지도/모델까지 설치되는 것은 아닙니다. 두 로봇을 같은 UI에서 운용할 때는 동일한 `map` 좌표계의 지도를 사용합니다.
 
-**다른 로봇의 보정:** 위 JSON의 카메라 행렬·왜곡·호모그래피·ROI·mounting_id는 기존 robot1 기준입니다. 카메라 높이/각도/렌즈/차선 폭이 달라지면 복사만으로 적용 완료가 아닙니다. `pinky_bringup/config/pinky_camera.yaml`과 `pinky_lane_driving/config/ground_measurements.yaml`을 새 측정값으로 작성해 보정합니다.
+### 새 기체 보정
+
+1. 새 카메라의 intrinsic YAML과 실제 지면 대응점을 준비합니다. 형식 예시는 `pinky_bringup/config/pinky_camera.yaml`, `pinky_lane_driving/config/ground_measurements.yaml`입니다.
+2. 아래 명령으로 새 보정 결과를 생성합니다.
+3. 결과의 `calibration`, `mounting_id`, 실측 `path.width`를 운용 JSON에 반영합니다. 카메라 높이·각도·렌즈·ROI가 다르면 기존 robot1 보정을 그대로 사용하지 않습니다.
+4. 새 intrinsic YAML을 `pinky_bringup/config/pinky_camera.yaml`에도 적용하고 재빌드합니다. 차체 polygon·라이다/카메라 TF·바퀴 치수도 실물과 맞춥니다.
 
 ```bash
 ros2 run pinky_lane_driving lane_calibrate_ground \
@@ -149,33 +162,73 @@ ros2 run pinky_lane_driving lane_calibrate_ground \
   --output "$HOME/pinky_calibration/new_calibrated.json"
 ```
 
-위 명령은 설정 전체를 생성합니다. 생성된 제어값을 그대로 사용하지 말고, `new_calibrated.json`의 `calibration`·`mounting_id`와 실측 차선 폭을 시험용 JSON에 반영한 뒤 이 문서의 **0.03m/s 제한과 현재 튜닝값을 유지**합니다. 새 카메라 intrinsic 파일은 저장소의 `pinky_camera.yaml`에도 적용해 재빌드합니다. 차체 polygon/TF/라이다 높이도 실물과 맞춥니다. 기존 장비에서 벽 간격 2cm로 시험했다는 사실은 다른 기체의 안전 간격을 보증하지 않습니다.
+생성기는 제어 설정까지 만듭니다. **측정 YAML의 초기 튜닝값은 현장 프로필과 다릅니다.** 생성 파일 전체로 운용 JSON을 덮어쓰지 말고 위 보정 항목만 반영합니다. 현장 프로필의 네 속도는 0.06m/s, `min_lookahead=0.10`, `steering_gain=1.2`, 영상 신선도 1.1초, 명령 무응답 0.2초입니다. 기체별 미확인 항목이 있으면 먼저 정지·센서·비상정지 점검을 마칩니다.
 
-## 3. 로봇·관제 실행과 운용
+## 6. 로봇 이름·네트워크·첫 실행
 
-이 브랜치부터 로컬 주행 허가는 임무 서버가 1초마다 만료되기 전에 갱신합니다. 기존 별도 시험 시작/감시 스크립트를 사용하지 않습니다. **[UI_INTEGRATION.md](UI_INTEGRATION.md)**의 통합 launch 및 UI 운용 절차를 사용하세요.
+| 기체/장치 | robot_id | ROS_DOMAIN_ID |
+|---|---|---:|
+| 로봇 1 | robot1 | 21 |
+| 로봇 2 | robot2 | 19 |
+| 관제 PC | — | 22 |
 
-설치 직후 정지 진단이 별도로 필요하면 `tools/field_test/pinky_stationary_probe.py`를 로봇에서 실행할 수 있습니다. 정상 운용의 준비 검사·감시는 임무 서버가 담당합니다.
+다른 한 대로 robot1을 교체하면 이전 domain 21 기체를 종료합니다. 두 대를 동시에 사용하면 두 번째 로봇은 실행 명령의 `robot_id:=robot2`와 `ROS_DOMAIN_ID=19`를 함께 설정합니다. 이 두 ID/domain은 관제 코드에 이미 등록되어 있습니다. 다른 ID/domain은 관제의 `robot_config.py`, `domain_bridge.yaml`과 함께 수정·빌드합니다.
 
-## 4. 현재 검증 범위와 점검할 현상
+로봇과 PC는 DDS 통신 가능한 같은 네트워크, 시간 동기화가 필요합니다. `timedatectl status`로 시각을 확인합니다. `ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST`가 남아 있으면 다른 기체와 통신하지 못합니다. 표준 DDS에서는 [ROS 발견 범위 안내](https://docs.ros.org/en/jazzy/Tutorials/Advanced/Improved-Dynamic-Discovery.html)의 SUBNET 설정을 사용합니다. IP는 SSH 접속용이며 코드에 고정된 로봇 IP는 없습니다.
 
-- 10cm 최소 추종 거리에서 사용자가 회전 안쪽 선 밟음 감소·중앙 주행 개선을 확인했습니다.
-- 짧은 반대쪽 마스크로 경로가 소실되는 문제와 차체→경로 시작점의 인위적인 대각선 충돌 판정을 수정했습니다. 전방 정지 거리와 실제 명령 회전 궤적의 장애물 검사는 유지됩니다.
-- 수정 단계별로 약 3.55m, 0.20m, 0.16m를 주행했습니다. 마지막 구간은 사용자의 종료 Bool로 끝났으며 **최종 코드로 전체 곡선 코스를 연속 완주한 검증은 아닙니다.** 사용자는 끝단을 직선으로 연장할 계획입니다.
-- 다른 로봇·다른 카메라 보정·다른 벽 간격에서의 주행은 미검증입니다. `single_boundary`, `recent_path_no_boundaries`, `no_current_lane`, `lane_observation_stale`와 실제 움직임을 비교합니다.
-- 카메라 영상/rosbag을 자동 저장하는 기능은 추가하지 않았습니다. 통합 임무 서버는 작은 상태 메시지로 거리·종료 원인을 전달합니다.
+**이제 [실행·UI 사용법의 1절](UI_INTEGRATION.md#1-로봇-ssh-터미널--한-번-실행)부터 진행합니다.** 로봇과 PC 각각 launch 한 개만 실행합니다. 현장 감시·즉시 정지가 가능한 조건에서 UI의 차선 단독 시험부터 확인합니다.
 
-하드웨어 없는 검사:
+## 7. 기존 설치 업데이트
+
+주행을 종료하고 로봇 launch를 닫은 상태에서 진행합니다. 아래 clone 경로가 아닌 평면 `src/pinky_lane_driving` 구성이라면 실제 Git 저장소 위치에서 갱신합니다. 기존 파일을 지우거나 중복 clone하지 않습니다.
+
+```bash
+cd ~/pinky_robot_ws/src/pinky-lane-driving
+git status --short
+# 변경이 있으면 보관·커밋한 뒤 진행합니다. 강제 reset은 하지 않습니다.
+git fetch origin
+git switch codex/lane-field-20261001
+git pull --ff-only origin codex/lane-field-20261001
+source /opt/ros/jazzy/setup.bash
+source ~/camera_ws/install/setup.bash
+cd ~/pinky_robot_ws
+colcon build --symlink-install --packages-up-to pinky_robot_system
+```
+
+홈의 운용 JSON은 Git 업데이트로 바뀌지 않습니다. 기존 0.03 프로필을 현재 **0.06 차선 시험 프로필**로 전환할 때 실제 사용하는 파일을 지정하고 다음을 한 번 실행합니다. 보정값은 유지하고 원본을 백업합니다.
+
+```bash
+export PINKY_LANE_CONFIG="$HOME/pinky_calibration/lane_control_lane_only.json"
+# 기존 시험 기체라면 lane_control_lane_only_verified_20261001.json을 지정
+python3 - <<'PY'
+from pathlib import Path
+from datetime import datetime
+import json, os, shutil
+p = Path(os.environ['PINKY_LANE_CONFIG'])
+c = json.loads(p.read_text())
+shutil.copy2(p, p.with_name(p.name + '.before06_' + datetime.now().strftime('%Y%m%d_%H%M%S')))
+for group, key in [('behavior', 'cruise_speed'), ('control', 'max_speed'),
+                   ('path', 'fallback_speed'), ('path', 'blind_speed')]:
+    c[group][key] = 0.06
+c['crosswalk_control_enabled'] = False
+c['lidar_obstacle_stop_enabled'] = False
+p.write_text(json.dumps(c, indent=2) + '\n')
+print('Updated:', p)
+PY
+```
+
+워치독·임무 서버의 0.06 제한은 같은 브랜치 코드에 포함됩니다. JSON만 바꾸고 예전 바이너리를 실행하면 제한 불일치가 생깁니다. 빌드 후 새 터미널에서 source하고 실행합니다.
+
+## 8. 검사와 검증 범위
 
 ```bash
 cd ~/pinky_robot_ws/src/pinky-lane-driving
 ./.agents/tools/harness.sh fast
-# ROS 환경과 camera_ws를 source한 뒤, 별도 .agents/output에 빌드/검사
+source /opt/ros/jazzy/setup.bash
+source ~/camera_ws/install/setup.bash
 ./.agents/tools/harness.sh ros pinky_robot_system pinky_lane_driving pinky_fleet_safety
 ```
 
-단위 테스트·ROS 빌드·정지 점검·실주행은 서로 다른 검증입니다. 테스트 통과만으로 다른 기체의 주행 완료를 주장하지 않습니다.
+2026-10-03 확인: 로컬 알고리즘/감시 검사 139개, 실제 로봇 설치 환경 검사 138개, 격리 ROS 임무 검사 8개 통과. 0.06 속도 허용·초과 차단·허가 해제를 검사했습니다. 실제 로봇에 파일/설정 적용 및 패키지 빌드는 완료됐습니다. **0.06 실주행, 새 기체의 주행, 새 OS의 전체 설치는 미검증**입니다. 이전 0.03 실험의 출구 도착 확인과 구분합니다.
 
-### 공유 브랜치 포장 시 검증
-
-현재 PC에서 로봇 의존 패키지 9개 빌드, 순수 알고리즘 테스트 132개를 통과했습니다. 격리 domain 177에서 새 임무 서버 테스트 6개와 로컬 허가 테스트 2개가 통과했습니다. 기존 현장 스냅샷의 ROS 제어 테스트 12개는 이전 공유 작업에서 통과했으며 차선 제어 알고리즘은 이번 통합에서 변경하지 않았습니다. 패키지 검사 최종 집계는 오류/실패 0개이며 기존 skip 1개가 있습니다. XML 검사는 외부 ROS 스키마 서버 접근 오류가 있어 공식 `ros-infrastructure/rep`의 XSD를 로컬 catalog로 연결한 뒤 통과했습니다. 새 로봇에 대한 깨끗한 OS 설치와 실주행은 별도 확인 대상입니다. 모델·현장 영상·rosbag·자격증명은 포함하지 않습니다. tests의 작은 경로 좌표 fixture는 알고리즘 회귀 검증용이며 영상 데이터셋을 포함하지 않습니다.
+확인할 상태는 `single_boundary`, `recent_path_no_boundaries`, `no_current_lane`, `lane_observation_stale`, 실제 이동 거리·종료 이유입니다. 자동 영상/rosbag/CSV 수집 기능은 없습니다. `tools/field_test/pinky_stationary_probe.py`는 선택적 정지 진단용이고 정상 운용은 UI에서 합니다.
