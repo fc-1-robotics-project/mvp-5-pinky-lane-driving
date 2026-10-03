@@ -1,0 +1,40 @@
+drive_mode_mux:
+  ros__parameters:
+    nav_input_topic: cmd_vel_nav_candidate
+    lane_input_topic: cmd_vel_lane_candidate
+    manual_input_topic: cmd_vel_manual_candidate
+    output_topic: cmd_vel_candidate
+    mode_request_topic: drive/mode_request
+    mode_status_topic: drive/mode_status
+    lane_finish_topic: lane/finish
+    lane_completed_topic: lane/completed
+    command_timeout_sec: 0.25
+    output_rate_hz: 20.0
+    status_rate_hz: 5.0
+
+fleet_velocity_gate:
+  ros__parameters:
+    robot_id: robot
+    input_cmd_vel_topic: cmd_vel_candidate
+    output_cmd_vel_topic: cmd_vel
+    permit_topic: fleet/permit
+    heartbeat_topic: fleet/heartbeat
+    command_timeout_sec: 0.25
+    max_permit_ttl_sec: 1.0
+    output_rate_hz: 20.0
+    heartbeat_rate_hz: 5.0
+    led_enabled: true
+    led_service_topic: /set_led
+    led_run_rgb: [0, 255, 0]
+    led_hold_rgb: [255, 180, 0]
+    led_stop_rgb: [255, 0, 0]
+
+fleet_pose_reporter:
+  ros__parameters:
+    source_pose_topic: amcl_pose
+    output_pose_topic: fleet/pose
+    global_frame: map
+    robot_base_frame: base_footprint
+    publish_rate_hz: 5.0
+    transform_timeout_sec: 0.05
+    transform_stale_sec: 2.0

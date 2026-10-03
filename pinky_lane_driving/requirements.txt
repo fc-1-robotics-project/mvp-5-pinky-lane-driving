@@ -1,0 +1,3 @@
+# ROS dependencies are declared in package.xml. This is the non-ROS inference
+# dependency used by lane_perception; it installs a compatible PyTorch build.
+ultralytics==8.4.148

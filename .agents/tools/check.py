@@ -21,5 +21,6 @@ def run_suite(directory):
 if __name__ == '__main__':
     root = Path(__file__).resolve().parents[2]
     sys.path.insert(0, str(root))
+    sys.path.insert(0, str(root / 'pinky_lane_driving'))
     sys.path.insert(0, str(root / '.agents'))
     sys.exit(run_suite(root / 'tests'))

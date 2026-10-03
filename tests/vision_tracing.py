@@ -1,0 +1,67 @@
+# Copyright 2026 SeungHoon Jeong
+# SPDX-License-Identifier: Apache-2.0
+"""Run with the replay Python: unittest discover -s tests -p 'vision_*.py'."""
+
+import unittest
+from types import SimpleNamespace
+
+from pinky_lane_driving.tracing import trace_polygon
+from pinky_lane_driving.calibration import Calibration
+from test_calibration import synthetic_config
+from pinky_lane_driving.vision import decode_image
+
+
+class TracingTest(unittest.TestCase):
+    def test_ros_rgb_stride_and_invalid_buffer(self):
+        message = SimpleNamespace(encoding='rgb8', width=1, height=2, step=4,
+                                  data=bytes([10, 20, 30, 99, 40, 50, 60, 99]))
+        self.assertEqual(decode_image(message).tolist(), [[[30, 20, 10]], [[60, 50, 40]]])
+        message.data = b''
+        with self.assertRaises(ValueError):
+            decode_image(message)
+
+    def test_metric_overlay_roundtrip_with_distortion(self):
+        config = synthetic_config()
+        config['distortion'] = [.01, -.001, .0001, .0002, 0.]
+        cal = Calibration(config)
+        original = [(30., 70.), (70., 30.)]
+        projected = cal.project(original)
+        restored = cal.image_points(projected)
+        for a, b in zip(original, restored):
+            self.assertAlmostEqual(a[0], b[0], places=4)
+            self.assertAlmostEqual(a[1], b[1], places=4)
+
+    def test_vertical_strip_stays_centered_and_near_to_far(self):
+        points = trace_polygon([(40, 10), (60, 10), (60, 95), (40, 95)], (100, 100))
+        self.assertGreater(len(points), 5)
+        self.assertGreater(points[0][1], points[-1][1])
+        self.assertTrue(all(abs(x - 50) <= 3 for x, _ in points))
+
+    def test_right_angle_not_replaced_by_centroid(self):
+        polygon = [(20, 95), (30, 95), (30, 40), (90, 40), (90, 30), (20, 30)]
+        points = trace_polygon(polygon, (100, 100))
+        self.assertGreater(points[0][1], 80)
+        self.assertGreater(points[-1][0], 75)
+        self.assertTrue(any(y < 45 and x < 40 for x, y in points))
+
+    def test_outer_diagonal_still_starts_at_bottommost_endpoint(self):
+        polygon = [(485, 276), (493, 270), (576, 346), (568, 354)]
+        points = trace_polygon(polygon, (640, 480))
+        self.assertGreater(len(points), 5)
+        self.assertGreater(points[0][1], points[-1][1])
+
+    def test_large_cropped_strip_and_diagonal_have_open_endpoints(self):
+        for polygon in (
+                [(280, 120), (310, 120), (310, 479), (280, 479)],
+                [(80, 180), (90, 170), (639, 459), (629, 479)],
+                [(20, 479), (50, 479), (50, 150), (600, 150),
+                 (600, 120), (20, 120)]):
+            points = trace_polygon(polygon, (640, 480))
+            self.assertGreater(len(points), 20)
+            self.assertGreater(points[0][1], points[-1][1])
+            self.assertTrue(all(0 <= x <= 640 and 0 <= y <= 480 for x, y in points))
+
+    def test_invalid_or_degenerate_mask_fails(self):
+        for polygon in [[], [(0, 0)], [(1, 1), (1, 1), (1, 1)]]:
+            with self.assertRaises(ValueError):
+                trace_polygon(polygon, (100, 100))

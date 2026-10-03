@@ -1,0 +1,9 @@
+front_camera:
+  ros__parameters:
+    video_device: /dev/video0
+    framerate: 30.0
+    frame_id: front_camera_link
+    pixel_format: mjpeg2rgb
+    image_width: 640
+    image_height: 480
+    calibration_file: ''

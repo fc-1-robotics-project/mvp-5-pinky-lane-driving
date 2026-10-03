@@ -1,0 +1,20 @@
+image_width: 640
+image_height: 480
+camera_name: ov5647__base_axi_pcie_120000_rp1_i2c_80000_ov5647_36_640x480
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [562.2577449297581, 0, 325.0889098170104, 0, 560.4524536230334, 247.5076156956044, 0, 0, 1]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [0.07412663922823402, -0.2159761619033038, 0.002077593850619344, 0.001709101215316724, 0]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [561.9970703125, 0, 326.819755145174, 0, 0, 562.8644409179688, 248.6777927238345, 0, 0, 0, 1, 0]

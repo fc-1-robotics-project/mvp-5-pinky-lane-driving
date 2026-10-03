@@ -14,6 +14,8 @@ find_package(rosidl_default_generators REQUIRED)
 
 set(
   MSG_FILES
+  "msg/FleetPermit.msg"
+  "msg/RobotHeartbeat.msg"
 )
 
 set(
@@ -26,6 +28,7 @@ set(
 
 set(
   ACTION_FILES
+  "action/FollowLane.action"
 )
 
 rosidl_generate_interfaces(
