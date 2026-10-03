@@ -153,9 +153,71 @@ class RosControlTest(unittest.TestCase):
         self.assertEqual(args['path'][0], (0., 0.))
         self.assertEqual(args['path'][-1][1], 0.)
         self.assertGreater(args['path'][-1][0], .06)
+        limits = self.controller.core.limits
+        forward = (limits.max_speed *
+                   (limits.latency + self.controller.sensors['scan_timeout_s'] + .05)
+                   + limits.max_speed**2 / (2 * limits.braking_decel))
+        self.assertAlmostEqual(args['path'][-1][0], forward)
         self.assertEqual(args['steering_path'][0], (0., 0.))
         self.assertGreater(args['steering_path'][-1][1], 0.)
         self.assertGreater(args['steering_guard'], 0.)
+
+    def test_turn_preview_clears_side_return_but_keeps_front_and_turn_hits(self):
+        # Field profile: a full 11.25 cm straight preview intersects the outside
+        # of a left bend even though the executable turn clears it. Mirror the
+        # scene to cover both directions. Exercise the real scan/footprint code.
+        from dataclasses import replace
+        self.wait(lambda: any(m.linear.x > 0 for m in self.messages))
+        self.controller.timer.cancel()
+        self.timer.cancel()
+        self.controller.core.limits = replace(
+            self.controller.core.limits, max_speed=.03, latency=.2,
+            braking_decel=.15, timeout=1.1)
+        self.controller.sensors.update(
+            scan_timeout_s=.3, footprint_radius_m=.11,
+            footprint_polygon_m=((-.08,-.06),(.06,-.06),(.06,.06),(-.08,.06)),
+            footprint_padding_m=0., infinity_is_clear=True)
+
+        def inspect(point, curvature, measured_speed=0.):
+            now = self.probe.get_clock().now()
+            scan = LaserScan()
+            scan.header.stamp, scan.header.frame_id = now.to_msg(), 'laser'
+            scan.angle_min = math.atan2(point[1], point[0])
+            scan.angle_increment = 2 * math.pi / 360
+            scan.angle_max = scan.angle_min + 359 * scan.angle_increment
+            scan.range_min, scan.range_max = .02, 3.
+            scan.ranges = [math.hypot(*point)] + [math.inf] * 359
+            odom = Odometry()
+            odom.header.stamp = now.to_msg()
+            odom.header.frame_id, odom.child_frame_id = 'odom', 'base_footprint'
+            odom.pose.pose.orientation.w = 1.
+            odom.twist.twist.linear.x = measured_speed
+            self.controller.receive_odom(odom)
+            self.controller.receive_scan(scan)
+            self.controller.last_diagnostic_time = -math.inf
+            with patch('pinky_lane_driving.ros_control.command', return_value=
+                       Proposal(.03, .03 * curvature, curvature, (.19,.1), 'tracking')), \
+                 patch.object(self.controller.diagnostic_publisher, 'publish') as pub:
+                self.controller.tick()
+            diagnostic = json.loads(pub.call_args.args[0].data)
+            self.assertTrue(diagnostic['scan_coverage_ok'], diagnostic)
+            self.assertIsNone(diagnostic['sensor_error'], diagnostic)
+            return diagnostic
+
+        for sign in (-1., 1.):
+            clear = inspect((.110, -sign * .055), sign * 5.56)
+            self.assertFalse(clear['scan_hit'])
+            self.assertAlmostEqual(clear['collision_horizon_m'], .1125)
+            self.assertAlmostEqual(clear['forward_stop_horizon_m'], .0195)
+            # An outside-lane point is still blocking if the physical body can
+            # hit it. Keep close front, commanded-turn, and current-body hits.
+            for point in ((.075, 0.), (.14, sign * .07), (.08,-sign * .045), (.04,0.)):
+                self.assertTrue(inspect(point, sign * 5.56)['scan_hit'], point)
+            # The forward envelope expands for measured overspeed; it must not
+            # shrink merely because the requested command is only 3 cm/s.
+            fast = inspect((.110, -sign * .055), sign * 5.56, measured_speed=.1)
+            self.assertTrue(fast['scan_hit'])
+            self.assertGreater(fast['forward_stop_horizon_m'], .08)
 
     def test_legacy_missing_margin_keys_default_to_controller_margin(self):
         legacy = copy.deepcopy(self.config)

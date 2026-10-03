@@ -202,6 +202,7 @@ class ControlNode(Node):
         selected_odom = selected_scan = None
         sensor_error = None
         collision_horizon = None
+        forward_stop_horizon = None
         emergency = (self.estop is None or self.estop[0]
                      or time.monotonic() - self.estop[1] > self.sensors['estop_timeout_s'])
         try:
@@ -227,11 +228,12 @@ class ControlNode(Node):
                                    previous_speed=self.core.previous_speed,
                                    requested_speed=self.core.limits.max_speed, metric_valid=True,
                                    limits=self.core.limits)
-                path, collision_horizon = stopping_corridor(
-                    path, max_speed=self.core.limits.max_speed, measured_speed=measured_speed,
+                stopping_limits = dict(
+                    max_speed=self.core.limits.max_speed, measured_speed=measured_speed,
                     decel=self.core.limits.braking_decel, latency=self.core.limits.latency,
-                    scan_timeout=self.sensors['scan_timeout_s'],
-                    observation_timeout=self.core.limits.timeout, timer_period=.05,
+                    scan_timeout=self.sensors['scan_timeout_s'], timer_period=.05)
+                path, collision_horizon = stopping_corridor(
+                    path, **stopping_limits, observation_timeout=self.core.limits.timeout,
                     stop_margin=self.obstacle_stop_margin_m)
                 steering_path, steering_guard = None, 0.
                 if geometry.reason == 'tracking':
@@ -240,13 +242,16 @@ class ControlNode(Node):
                              else self.sensors['footprint_radius_m'])
                     steering_path, steering_guard = steering_corridor(
                         collision_horizon, geometry.curvature, reach)
-                    # The reference lane may begin off to one side while the
-                    # preview target commands the opposite turn. A diagonal
-                    # origin-to-reference connector is not an executable
-                    # trajectory. Check the actual command arc plus a forward
-                    # stopping corridor (conservative for steering response),
-                    # with the same full footprint and stopping horizon.
-                    path = ((0., 0.), (collision_horizon, 0.))
+                    # The command arc retains the full preview and stop margin.
+                    # Also protect forward reaction/braking travel in case the
+                    # steering response lags. The independently refreshed lidar
+                    # can stop this motion without waiting for another camera
+                    # frame. Extending this straight alternative through the
+                    # camera lease + preview margin falsely blocks side walls
+                    # that the commanded turn clears.
+                    path, forward_stop_horizon = stopping_corridor(
+                        ((0., 0.), (collision_horizon, 0.)), **stopping_limits,
+                        observation_timeout=0., stop_margin=0.)
                 hit = scan_collision(scan.ranges, angle_min=scan.angle_min,
                                      angle_increment=scan.angle_increment, range_min=scan.range_min,
                                      range_max=scan.range_max, scan_pose=scan_pose, path=path,
@@ -295,6 +300,7 @@ class ControlNode(Node):
             diagnostic['tf_scan_rewind_s'] = (stamp_seconds(self.scan[0]) - stamp_seconds(selected_scan)
                                               if self.scan and selected_scan is not None else None)
             diagnostic['collision_horizon_m'] = collision_horizon
+            diagnostic['forward_stop_horizon_m'] = forward_stop_horizon
             diagnostic['obstacle_stop_margin_m'] = self.obstacle_stop_margin_m
             diagnostic['recovery_min_path_length_m'] = self.core.recovery_min_path_length_m
             diagnostic['self_filter_radius_m'] = self.sensors.get('self_filter_radius_m')
