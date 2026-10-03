@@ -29,7 +29,8 @@ ROS가 없으면 먼저 [ROS Jazzy 공식 Ubuntu 설치 안내](https://docs.ros
 ```bash
 sudo apt update
 sudo apt install git python3-colcon-common-extensions python3-rosdep \
-  python3-venv python3-pip python3-pytest libcamera-dev
+  python3-venv python3-pip python3-pytest libcamera-dev \
+  ros-jazzy-camera-info-manager
 source /opt/ros/jazzy/setup.bash
 mkdir -p ~/pinky_robot_ws/src
 git clone --branch codex/lane-field-20261001 \
@@ -57,6 +58,8 @@ colcon build --symlink-install --packages-select camera_ros
 source ~/camera_ws/install/setup.bash
 ```
 
+`/usr/local`의 libcamera 0.3.2를 쓰는 기체는 빌드 전에 `export PKG_CONFIG_PATH="/usr/local/lib/aarch64-linux-gnu/pkgconfig:${PKG_CONFIG_PATH:-}"`를 설정합니다. 기준 커밋은 이 버전에서 `ControlTypePoint` switch 경고가 오류로 처리되어 실패하므로 `colcon build`에 `--cmake-args -DBUILD_TESTING=OFF -DCMAKE_CXX_FLAGS=-Wno-error=switch`를 추가합니다.
+
 기준 기체는 `/usr/local/lib/aarch64-linux-gnu`의 libcamera 0.3.2 환경입니다. 새 이미지에서 시스템 libcamera만으로 OV5647이 동작한다는 보장은 없습니다. 이미 별도 libcamera를 설치했다면 rosdep의 해당 의존성을 `--skip-keys libcamera`로 제외하고 사용한 라이브러리와 빌드 경로를 맞춥니다. Raspberry Pi용 libcamera 지원/빌드는 [camera_ros 공식 안내](https://github.com/christianrauch/camera_ros#build-instructions)를 참고합니다. 라이브러리 버전을 바꿨으면 camera_ros도 다시 빌드합니다.
 
 ### 추론 환경
@@ -75,9 +78,13 @@ source ~/camera_ws/install/setup.bash
 ```bash
 /usr/bin/python3 -m venv --system-site-packages ~/pinky_inference
 ~/pinky_inference/bin/python -m pip install \
-  'numpy==1.26.4' 'opencv-python==4.10.0.84' \
-  'torch==2.14.0' 'torchvision==0.29.0' 'ultralytics==8.4.148'
+  --index-url https://download.pytorch.org/whl/cpu \
+  'torch==2.14.0' 'torchvision==0.29.0'
+~/pinky_inference/bin/python -m pip install \
+  'numpy==1.26.4' 'opencv-python==4.10.0.84' 'ultralytics==8.4.148'
 ```
+
+torch는 반드시 CPU 저장소에서 먼저 설치합니다. 기본 PyPI의 aarch64 wheel은 Raspberry Pi에 필요 없는 NVIDIA CUDA 패키지 수 GB를 함께 받습니다.
 
 모델은 Git에 포함하지 않습니다. 팀에서 받은 모델을 **로봇 패키지 빌드 전에** `~/pinky_robot_ws/src/pinky-lane-driving/pinky_lane_driving/models/best.pt`로 복사합니다.
 
