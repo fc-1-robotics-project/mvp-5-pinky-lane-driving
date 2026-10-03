@@ -3,6 +3,13 @@ from pinky_lane_driving.mission_guard import MissionGuard
 
 
 class MissionGuardTest(unittest.TestCase):
+    def active_sample(self, guard, now, velocity, pose=(0., 0.)):
+        for key, value in dict(mode='LANE', gate=dict(permit_fresh=True, mode=1),
+                               velocity=velocity, command='follow', estop=False,
+                               pose=pose, diagnostic=guard.values['diagnostic']).items():
+            guard.note(key, value, now)
+        return guard.fault(now)
+
     def ready(self, now=1.):
         guard = MissionGuard()
         for key, value in dict(mode='STOP', velocity=(0.,0.), estop=True,
@@ -48,3 +55,21 @@ class MissionGuardTest(unittest.TestCase):
         self.assertEqual(problem,'no_odom_progress')
         g.note('velocity',(.05,0.),8.)
         self.assertEqual(g.fault(8.),'velocity_limit_exceeded')
+
+    def test_obstacle_wait_does_not_expire_restart_motion_timer(self):
+        g = self.ready()
+        self.assertEqual(self.active_sample(g, 1., (.03, 0.)), '')
+        for now in range(2, 13):
+            self.assertEqual(self.active_sample(g, float(now), (0., 0.)), '')
+        # Waiting for a lidar obstacle to clear is not a failed motion request.
+        self.assertEqual(self.active_sample(g, 12.1, (.005, 0.)), '')
+        self.assertEqual(self.active_sample(g, 12.15, (.01, 0.), (.004, 0.)), '')
+        self.assertEqual(self.active_sample(g, 18.14, (.03, 0.), (.004, 0.)), '')
+        self.assertEqual(self.active_sample(g, 18.16, (.03, 0.), (.004, 0.)),
+                         'no_odom_progress')
+
+    def test_zero_command_still_expires_persistent_stop_timer(self):
+        g = self.ready()
+        for now in range(1, 16):
+            self.assertEqual(self.active_sample(g, float(now), (0., 0.)), '')
+        self.assertEqual(self.active_sample(g, 16., (0., 0.)), 'persistent_stop')

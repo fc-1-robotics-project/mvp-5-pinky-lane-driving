@@ -126,6 +126,11 @@ class MissionGuard:
         self.previous_pose = pose
         if self.anchor is None or math.dist(pose, self.anchor) >= .003:
             self.anchor, self.last_progress = pose, now
+        if abs(v) < .002:
+            # An obstacle/clear-hold explicitly commands no forward movement.
+            # Do not carry that waiting time into the next motion attempt.
+            # The independent 15 s persistent-stop timer above still applies.
+            self.last_progress = now
         if abs(v) >= .002 and now - self.last_progress >= 6.:
             return 'no_odom_progress'
         return ''
