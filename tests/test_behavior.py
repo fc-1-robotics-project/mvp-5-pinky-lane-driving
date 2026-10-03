@@ -42,6 +42,25 @@ class BehaviorTest(unittest.TestCase):
         self.assertEqual(self.step(8., crosswalk=('a', .1)).state, 'FOLLOW')
         self.assertEqual(self.step(9., crosswalk=('b', .7)).state, 'APPROACH')
 
+    def test_slow_only_crosswalk_never_stops_and_resumes_after_passage(self):
+        self.fsm = Behavior(Settings(cruise_speed=.09, approach_speed=.06,
+                                     stop_distance=.15, stopped_speed=.01,
+                                     wait_s=2., clear_s=.5, decel=.15, latency=.2,
+                                     crosswalk_stop=False))
+        self.assertEqual(self.ready().speed_limit, .09)
+        for now, distance in ((1., .5), (2., .2), (3., .05), (4., 0.)):
+            decision = self.step(now, crosswalk=('a', distance), measured_speed=.06)
+            self.assertEqual((decision.state, decision.speed_limit, decision.reason),
+                             ('PASS', .06, 'crosswalk'))
+        # Out of the camera view while still on the crosswalk: stay slow.
+        self.assertEqual(self.step(5.).speed_limit, .06)
+        self.assertEqual(self.step(6., passed_id='a').speed_limit, .09)
+        self.assertEqual(self.step(7., crosswalk=('a', .1)).speed_limit, .09)
+        with self.assertRaises(ValueError):
+            Settings(cruise_speed=.09, approach_speed=.06, stop_distance=.15,
+                     stopped_speed=.01, wait_s=2., clear_s=.5, decel=.15, latency=.2,
+                     crosswalk_stop=1)
+
     def test_missing_crosswalk_in_approach_is_not_passed(self):
         self.ready()
         self.step(1., crosswalk=('a', .7))
