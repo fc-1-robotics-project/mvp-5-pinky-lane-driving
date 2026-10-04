@@ -56,6 +56,11 @@ class Behavior:
         self.clear_since = None
         self.last_time = None
 
+    def reset_crosswalk(self):
+        """Forget an unfinished crosswalk; safety clear timers are untouched."""
+        self.state = 'FOLLOW'
+        self.event_id = self.completed_id = self.wait_since = None
+
     def step(self, now, *, sensors_ok, estop, obstacle, crosswalk, passed_id, measured_speed):
         def stop(reason):
             return Decision(self.state, 0., reason)

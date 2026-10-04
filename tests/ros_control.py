@@ -116,6 +116,28 @@ class RosControlTest(unittest.TestCase):
         end = time.monotonic() + seconds
         self.wait(lambda: time.monotonic() >= end)
 
+    def test_new_mission_id_resets_crosswalk_once(self):
+        status = self.probe.create_publisher(String, 'lane/mission_status', 10)
+        core = self.controller.core
+        calls = []
+        core.start_mission = lambda: calls.append(core.crosswalks.active_id)
+
+        def send(**data):
+            status.publish(String(data=json.dumps(data)))
+            self.wait_duration(.15)
+
+        self.wait(lambda: status.get_subscription_count() > 0)
+        send(mission_id='m1', active=False)          # not started yet
+        send(mission_id='', active=True)
+        status.publish(String(data='not json'))
+        self.wait_duration(.15)
+        self.assertEqual(calls, [])
+        send(mission_id='m1', active=True)
+        send(mission_id='m1', active=True)           # 2 Hz status repeats the same mission
+        self.assertEqual(len(calls), 1)
+        send(mission_id='m2', active=True)
+        self.assertEqual(len(calls), 2)
+
     def test_valid_graph_moves_dry_run_then_scan_loss_stops(self):
         self.wait(lambda: any(m.linear.x > 0 for m in self.messages))
         self.wait(lambda: bool(self.diagnostics))

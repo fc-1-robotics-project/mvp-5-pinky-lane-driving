@@ -90,6 +90,11 @@ class CrosswalkTracker:
         self.world_points = ()
         self.start_pose = None
 
+    def reset(self):
+        """Drop the tracked event; serial keeps later identities unique."""
+        self.active_id = self.passed_id = self.start_pose = None
+        self.world_points = ()
+
     def update(self, polygons, path, pose):
         transform_points([], pose)
         if self.active_id is not None:

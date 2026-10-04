@@ -54,6 +54,16 @@ class DriveCore:
             return False
         return raw_hit
 
+    def start_mission(self):
+        """Forget a crosswalk the previous mission never finished passing.
+
+        Call only for a NEW mission. A permission or heartbeat lapse inside
+        one mission must keep the remembered crosswalk, so this is not tied
+        to the emergency input.
+        """
+        self.behavior.reset_crosswalk()
+        self.crosswalks.reset()
+
     def observe(self, observation, *, now, pose):
         """Called on completed inference; pose is odom_from_base at capture time."""
         self.lane = LanePath(reason='invalid_observation')
