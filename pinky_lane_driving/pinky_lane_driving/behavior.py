@@ -18,6 +18,7 @@ class Settings:
     clear_s: float
     decel: float
     latency: float
+    crosswalk_stop: bool = True
 
     def __post_init__(self):
         if any(not math.isfinite(getattr(self, f.name)) or getattr(self, f.name) < 0
@@ -26,6 +27,8 @@ class Settings:
         if min(self.cruise_speed, self.approach_speed, self.wait_s,
                self.clear_s, self.decel) <= 0 or self.approach_speed > self.cruise_speed:
             raise ValueError('Invalid positive speed, hold or braking limits')
+        if type(self.crosswalk_stop) is not bool:
+            raise ValueError('crosswalk_stop must be a boolean')
 
 
 @dataclass(frozen=True)
@@ -52,6 +55,11 @@ class Behavior:
         self.wait_since = None
         self.clear_since = None
         self.last_time = None
+
+    def reset_crosswalk(self):
+        """Forget an unfinished crosswalk; safety clear timers are untouched."""
+        self.state = 'FOLLOW'
+        self.event_id = self.completed_id = self.wait_since = None
 
     def step(self, now, *, sensors_ok, estop, obstacle, crosswalk, passed_id, measured_speed):
         def stop(reason):
@@ -84,7 +92,9 @@ class Behavior:
             self.state = 'FOLLOW'
         if self.state == 'FOLLOW' and crosswalk is not None and crosswalk[0] != self.completed_id:
             self.event_id = crosswalk[0]
-            self.state = 'APPROACH'
+            # Without the stop, hold approach_speed from first sight until
+            # odometry proves the crosswalk is behind the robot.
+            self.state = 'APPROACH' if self.settings.crosswalk_stop else 'PASS'
         speed = self.settings.cruise_speed
         if self.state == 'APPROACH':
             if crosswalk is None or crosswalk[0] != self.event_id:

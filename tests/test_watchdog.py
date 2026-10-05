@@ -37,14 +37,14 @@ class WatchdogTest(unittest.TestCase):
         self.assertTrue(dog.receive(2,.03,.1,now=2.,source_age=.1))
         self.assertEqual(dog.output(2.21),(0.,0.))
 
-    def test_six_cm_profile_stops_on_age_or_silence(self):
-        dog=Watchdog(timeout=.2,max_source_age=1.1,max_speed=.06,max_omega=.6,enabled=True)
-        self.assertTrue(dog.receive(1,.06,.1,now=1.,source_age=.9))
-        self.assertEqual(dog.output(1.16),(.06,.1))
+    def test_nine_cm_profile_stops_on_age_or_silence(self):
+        dog=Watchdog(timeout=.2,max_source_age=1.1,max_speed=.09,max_omega=.6,enabled=True)
+        self.assertTrue(dog.receive(1,.09,.1,now=1.,source_age=.9))
+        self.assertEqual(dog.output(1.16),(.09,.1))
         self.assertEqual(dog.output(1.21),(0.,0.))
-        self.assertTrue(dog.receive(2,.06,.1,now=2.,source_age=1.05))
+        self.assertTrue(dog.receive(2,.09,.1,now=2.,source_age=1.05))
         self.assertEqual(dog.output(2.06),(0.,0.))
-        self.assertFalse(dog.receive(3,.061,.1,now=3.,source_age=.1))
+        self.assertFalse(dog.receive(3,.091,.1,now=3.,source_age=.1))
 
     def test_duplicate_or_out_of_order_cannot_refresh_lease(self):
         dog = self.make()

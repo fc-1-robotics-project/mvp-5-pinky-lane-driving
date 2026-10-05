@@ -207,6 +207,53 @@ class RuntimeTest(unittest.TestCase):
         self.assertEqual(self.tick(1.).speed, 0.)
         self.assertEqual(self.core.behavior.state, 'WAIT')
 
+    def crosswalk_seen(self, time=1.):
+        obs = observation(time)
+        obs['detections'].append(dict(class_id=0, polygon_px=((20., 80.), (80., 80.),
+                                                             (80., 90.), (20., 90.))))
+        self.core.observe(obs, now=time, pose=(0., 0., 0.))
+        self.tick(time)
+
+    def test_new_mission_does_not_inherit_unfinished_crosswalk(self):
+        # A mission that ends before odometry confirms passage used to leave
+        # the next mission in the crosswalk state from its first tick.
+        for stop, state in ((True, 'WAIT'), (False, 'PASS')):
+            with self.subTest(crosswalk_stop=stop):
+                self.core = DriveCore(self.core.tracker, self.core.limits,
+                                      replace(self.core.behavior.settings, crosswalk_stop=stop),
+                                      CrosswalkTracker(group_gap=.2, association_distance=.4,
+                                                       passed_margin=.15), scan_timeout=.2)
+                self.core.tracker.reset()
+                self.crosswalk_seen()
+                self.assertEqual(self.core.behavior.state, state)
+                event = self.core.crosswalks.active_id
+                self.assertIsNotNone(event)
+                self.tick(1.05, estop=True)              # mission ends: permission released
+                self.core.start_mission()
+                self.update(1.1)                         # next mission, no crosswalk in view
+                self.tick(1.1)
+                self.assertEqual(self.core.behavior.state, 'FOLLOW')
+                self.assertIsNone(self.core.crosswalks.active_id)
+                self.crosswalk_seen(1.2)                 # a later event gets a new identity
+                self.assertNotEqual(self.core.crosswalks.active_id, event)
+
+    def test_permission_lapse_inside_a_mission_keeps_the_crosswalk(self):
+        for stop, state in ((True, 'WAIT'), (False, 'PASS')):
+            for lapse in (True, None):
+                with self.subTest(crosswalk_stop=stop, estop=lapse):
+                    self.core = DriveCore(self.core.tracker, self.core.limits,
+                                          replace(self.core.behavior.settings, crosswalk_stop=stop),
+                                          CrosswalkTracker(group_gap=.2, association_distance=.4,
+                                                           passed_margin=.15), scan_timeout=.2)
+                    self.core.tracker.reset()
+                    self.crosswalk_seen()
+                    event = self.core.crosswalks.active_id
+                    self.tick(1.05, estop=lapse)
+                    self.update(1.1)                     # crosswalk no longer in view
+                    self.tick(1.1)
+                    self.assertEqual(self.core.behavior.state, state)
+                    self.assertEqual(self.core.crosswalks.active_id, event)
+
     def test_crosswalk_bypass_preserves_lane_and_safety_controls(self):
         self.core = DriveCore(self.core.tracker, self.core.limits,
                               self.core.behavior.settings, self.core.crosswalks,

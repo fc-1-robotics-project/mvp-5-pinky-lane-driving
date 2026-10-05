@@ -57,7 +57,7 @@ def generate_launch_description():
         DeclareLaunchArgument('lane_start_enabled', default_value='false'),
         DeclareLaunchArgument('finish_topic', default_value='lane/finish'),
         DeclareLaunchArgument('max_source_age_s', default_value='1.1'),
-        DeclareLaunchArgument('max_speed_mps', default_value='0.06'),
+        DeclareLaunchArgument('max_speed_mps', default_value='0.09'),
         DeclareLaunchArgument('max_omega_radps', default_value='0.6'),
 
         IncludeLaunchDescription(

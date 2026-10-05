@@ -26,7 +26,7 @@ class LaneMissionServer(Node):
     HEALTHY_REASONS = {'follow', 'tracking', 'crosswalk'}
     WATCHDOG = dict(dry_run=False, hardware_watchdog_confirmed=True,
                     command_timeout_s=.2, max_source_age_s=1.1,
-                    max_speed_mps=.06, max_omega_radps=.6,
+                    max_speed_mps=.09, max_omega_radps=.6,
                     output_topic='cmd_vel_lane_candidate')
 
     def __init__(self):

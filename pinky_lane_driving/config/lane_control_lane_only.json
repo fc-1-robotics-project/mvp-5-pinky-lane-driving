@@ -64,7 +64,7 @@
     "max_near": 0.6,
     "sample_step": 0.03,
     "fallback_timeout": 0.3,
-    "fallback_speed": 0.06,
+    "fallback_speed": 0.09,
     "blind_timeout": 1.5,
     "blind_distance": 0.06,
     "blind_speed": 0.06,
@@ -73,7 +73,7 @@
     "width": 0.17
   },
   "control": {
-    "max_speed": 0.06,
+    "max_speed": 0.09,
     "max_omega": 0.6,
     "max_accel": 0.1,
     "max_lateral_accel": 0.12,
@@ -87,14 +87,15 @@
     "steering_gain": 1.2
   },
   "behavior": {
-    "cruise_speed": 0.06,
-    "approach_speed": 0.02,
+    "cruise_speed": 0.09,
+    "approach_speed": 0.06,
     "stop_distance": 0.15,
     "stopped_speed": 0.01,
     "wait_s": 2.0,
     "clear_s": 0.5,
     "decel": 0.15,
-    "latency": 0.2
+    "latency": 0.2,
+    "crosswalk_stop": false
   },
   "crosswalk": {
     "group_gap": 0.2,
@@ -130,7 +131,7 @@
     "infinity_is_clear": true,
     "obstacle_stop_margin_m": 0.06
   },
-  "crosswalk_control_enabled": false,
-  "lidar_obstacle_stop_enabled": false,
+  "crosswalk_control_enabled": true,
+  "lidar_obstacle_stop_enabled": true,
   "recovery_min_path_length_m": 0.06
 }

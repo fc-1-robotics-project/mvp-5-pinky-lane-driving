@@ -115,6 +115,9 @@ class ControlNode(Node):
         self.odom_sub = self.create_subscription(Odometry, 'odom', self.receive_odom, sensor_qos)
         self.scan_sub = self.create_subscription(LaserScan, 'scan', self.receive_scan, sensor_qos)
         self.stop_sub = self.create_subscription(Bool, 'lane/estop', self.receive_stop, 1)
+        self.mission_id = ''
+        self.mission_sub = self.create_subscription(
+            String, 'lane/mission_status', self.receive_mission, 10)
         self.observation_sub = self.create_subscription(String, 'lane/observation', self.observe, 1)
         self.timer = self.create_timer(.05, self.tick, clock=Clock(clock_type=ClockType.STEADY_TIME))
 
@@ -136,6 +139,18 @@ class ControlNode(Node):
 
     def receive_stop(self, message):
         self.estop = (message.data, time.monotonic())
+
+    def receive_mission(self, message):
+        """Reset mission-scoped state once per accepted FollowLane goal."""
+        try:
+            status = json.loads(message.data)
+            mission_id = status['mission_id']
+            active = status['active'] is True
+        except (ValueError, TypeError, KeyError):
+            return
+        if active and isinstance(mission_id, str) and mission_id and mission_id != self.mission_id:
+            self.mission_id = mission_id
+            self.core.start_mission()
 
     def tf_pose(self, target, source, stamp):
         transform = self.buffer.lookup_transform(target, source,

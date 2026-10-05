@@ -78,7 +78,7 @@ class LaneMissionTest(unittest.TestCase):
             lane_reason='paired', scan_hit=False, scan_coverage_ok=True,
             capture_age_s=.1, scan_age_s=.1, odom_age_s=.1))))
         if self.send_commands:
-            payload = dict(reason=self.reason, capture_stamp=time.time(), speed=.06, omega=0.)
+            payload = dict(reason=self.reason, capture_stamp=time.time(), speed=.09, omega=0.)
             self.command_pub.publish(String(data=json.dumps(payload)))
 
     def wait(self, predicate, timeout=5.):
@@ -100,9 +100,9 @@ class LaneMissionTest(unittest.TestCase):
         return handle.get_result_async()
 
     def test_final_follow_reason_arms_and_finish_stops(self):
-        self.linear_speed = .06
+        self.linear_speed = .09
         result = self.goal()
-        self.wait(lambda: self.server.guard.values.get('velocity') == (.06, 0.))
+        self.wait(lambda: self.server.guard.values.get('velocity') == (.09, 0.))
         self.finish_pub.publish(Bool(data=True))
         self.wait(result.done)
         self.assertEqual(result.result().status, GoalStatus.STATUS_SUCCEEDED)
@@ -110,7 +110,7 @@ class LaneMissionTest(unittest.TestCase):
         self.wait(lambda: self.modes[-1] == 'STOP')
 
     def test_old_watchdog_limit_is_rejected_before_arming(self):
-        self.watchdog.set_parameters([Parameter('max_speed_mps', value=.03)])
+        self.watchdog.set_parameters([Parameter('max_speed_mps', value=.06)])
         result = self.goal()
         self.wait(result.done)
         self.assertEqual(result.result().result.code, FollowLane.Result.RESULT_FAULT)
@@ -118,8 +118,8 @@ class LaneMissionTest(unittest.TestCase):
         self.assertNotIn('LANE', self.modes)
         self.assertFalse(self.safety.enabled)
 
-    def test_speed_over_six_cm_aborts_and_releases_permission(self):
-        self.linear_speed = .061
+    def test_speed_over_nine_cm_aborts_and_releases_permission(self):
+        self.linear_speed = .091
         result = self.goal()
         self.wait(result.done)
         self.assertEqual(result.result().result.code, FollowLane.Result.RESULT_FAULT)
