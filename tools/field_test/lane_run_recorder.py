@@ -113,7 +113,8 @@ class Recorder(Node):
                    path_length=round(sum(math.dist(a, b) for a, b in zip(points, points[1:])), 3),
                    **{key: data.get(key) for key in (
                        'reason', 'lane_valid', 'lane_degraded', 'lane_reason', 'capture_age_s',
-                       'observation_error', 'sensor_error', 'scan_hit', 'raw_scan_hit', 'fault')})
+                       'observation_error', 'sensor_error', 'scan_hit', 'raw_scan_hit', 'fault',
+                       'collision_horizon_m', 'forward_stop_horizon_m', 'lidar_obstacle_stop_enabled')})
 
     def observation(self, message):
         try:
