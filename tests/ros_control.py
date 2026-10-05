@@ -206,6 +206,11 @@ class RosControlTest(unittest.TestCase):
         self.assertEqual(args['steering_path'][0], (0., 0.))
         self.assertGreater(args['steering_path'][-1][1], 0.)
         self.assertGreater(args['steering_guard'], 0.)
+        # the heading-straight check is limited to the lane, not to the whole lane path preview
+        self.assertGreater(len(args['lane_path']), 1)
+        self.assertGreater(args['lane_path'][-1][0], args['path'][-1][0])
+        self.assertAlmostEqual(args['lane_half_width'], self.controller.straight_check_half_width_m)
+        self.assertGreater(args['lane_half_width'], 0.)
 
     def test_turn_preview_clears_side_return_but_keeps_front_and_turn_hits(self):
         # Field profile: a full 11.25 cm straight preview intersects the outside

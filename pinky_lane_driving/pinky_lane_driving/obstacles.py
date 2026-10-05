@@ -179,7 +179,8 @@ def scan_collision(ranges, *, angle_min, angle_increment, range_min, range_max,
                    scan_pose, path, radius, age, timeout, infinity_is_clear=False,
                    footprint=None, padding=0., self_filter_bounds=None,
                    self_filter_pose=None, self_filter_radius=None,
-                   steering_path=None, steering_guard=0.):
+                   steering_path=None, steering_guard=0., lane_path=None,
+                   lane_half_width=None):
     """Return hit/no-hit/unknown for available laser returns in a swept corridor.
 
     radius is measured robot circumscribed footprint radius plus safety margin.
@@ -192,6 +193,10 @@ def scan_collision(ranges, *, angle_min, angle_increment, range_min, range_max,
     ROS adapter must independently validate FOV/angular coverage of the corridor.
     Infinity is unknown unless the driver explicitly documents no-return as clear.
     This cannot detect objects below the scan plane; it never commands avoidance.
+    With steering_path, the heading-straight reaction corridor `path` only counts
+    returns within lane_half_width of lane_path (robot origin plus lane points):
+    a wall beside a curve is not in the way of that reaction travel. The commanded
+    steering arc and the planned path are never filtered.
     """
     values = (angle_min, angle_increment, range_min, range_max, radius, age, timeout)
     if (not all(math.isfinite(v) for v in values) or radius <= 0 or timeout <= 0
@@ -257,12 +262,24 @@ def scan_collision(ranges, *, angle_min, angle_increment, range_min, range_max,
         laser_points.append(point)
     points = transform_points(laser_points, scan_pose)
     swept = ((0., 0.),) + path
+    straight = points
+    if steering_path is not None and lane_path is not None and lane_half_width is not None:
+        try:
+            lane = ((0., 0.),) + transform_points(lane_path, (0., 0., 0.))
+            if (len(lane) < 3 or not math.isfinite(lane_half_width) or lane_half_width <= 0
+                    or sum(math.dist(a, b) for a, b in zip(lane, lane[1:])) <= 1e-6):
+                raise ValueError
+        except (ValueError, TypeError):
+            lane = None   # unusable lane: keep the unfiltered, conservative check
+        if lane is not None:
+            straight = [p for p in points if any(point_segment_distance(p, a, b) <= lane_half_width
+                                                 for a, b in zip(lane, lane[1:]))]
     if footprint is not None:
-        return (swept_footprint_hit(points, swept, footprint, padding)
+        return (swept_footprint_hit(straight, swept, footprint, padding)
                 or steering_path is not None and swept_footprint_hit(
                     points, steering_path, footprint, padding+steering_guard))
     if steering_path is not None and any(point_segment_distance(p,a,b)<=radius+steering_guard
                                         for p in points for a,b in zip(steering_path,steering_path[1:])):
         return True
     return any(point_segment_distance(p, a, b) <= radius
-               for p in points for a, b in zip(swept, swept[1:]))
+               for p in straight for a, b in zip(swept, swept[1:]))

@@ -72,6 +72,9 @@ class ControlNode(Node):
         self.obstacle_stop_margin_m = nonnegative_margin(
             self.sensors.get('obstacle_stop_margin_m', limits.stop_margin),
             'obstacle_stop_margin_m')
+        # Heading-straight reaction check only counts returns inside the lane.
+        self.straight_check_half_width_m = settings.width / 2 + nonnegative_margin(
+            self.sensors.get('straight_check_lane_margin_m', 0.), 'straight_check_lane_margin_m')
         for key in ('scan_timeout_s', 'odom_timeout_s', 'estop_timeout_s',
                     'max_scan_gap_rad', 'footprint_radius_m'):
             if not math.isfinite(self.sensors[key]) or self.sensors[key] <= 0:
@@ -248,6 +251,7 @@ class ControlNode(Node):
                     max_speed=self.core.limits.max_speed, measured_speed=measured_speed,
                     decel=self.core.limits.braking_decel, latency=self.core.limits.latency,
                     scan_timeout=self.sensors['scan_timeout_s'], timer_period=.05)
+                path_for_lane = path
                 path, collision_horizon = stopping_corridor(
                     path, **stopping_limits, observation_timeout=self.core.limits.timeout,
                     stop_margin=self.obstacle_stop_margin_m)
@@ -279,7 +283,8 @@ class ControlNode(Node):
                                      self_filter_bounds=self.sensors.get('self_filter_bounds_m'),
                                      self_filter_radius=self.sensors.get('self_filter_radius_m'),
                                      self_filter_pose=self_pose, steering_path=steering_path,
-                                     steering_guard=steering_guard)
+                                     steering_guard=steering_guard, lane_path=path_for_lane,
+                                     lane_half_width=self.straight_check_half_width_m)
             increment = abs(scan.angle_increment)
             span = increment * (len(scan.ranges) - 1)
             # Conservative full-circle gate. Partial-FOV hardware needs a separate
