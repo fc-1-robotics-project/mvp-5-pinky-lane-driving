@@ -266,7 +266,8 @@ def scan_collision(ranges, *, angle_min, angle_increment, range_min, range_max,
     if steering_path is not None and lane_path is not None and lane_half_width is not None:
         try:
             lane = ((0., 0.),) + transform_points(lane_path, (0., 0., 0.))
-            if (len(lane) < 3 or not math.isfinite(lane_half_width) or lane_half_width <= 0):
+            if (len(lane) < 3 or not math.isfinite(lane_half_width) or lane_half_width <= 0
+                    or sum(math.dist(a, b) for a, b in zip(lane, lane[1:])) <= 1e-6):
                 raise ValueError
         except (ValueError, TypeError):
             lane = None   # unusable lane: keep the unfiltered, conservative check

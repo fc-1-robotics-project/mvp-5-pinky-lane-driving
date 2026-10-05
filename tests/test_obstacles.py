@@ -204,13 +204,15 @@ class ObstacleTest(unittest.TestCase):
         self.assertTrue(hit((.14, .02), lane_path=lane, lane_half_width=.085))  # inside the lane
         self.assertTrue(hit(beside, lane_path=lane[:1], lane_half_width=.085))  # unusable lane
         self.assertTrue(hit(beside, lane_path=lane, lane_half_width=0.))
+        self.assertTrue(hit(beside, lane_path=((0., 0.), (0., 0.)), lane_half_width=.085))  # zero-length lane
+        self.assertTrue(hit(beside, lane_path=((math.nan, 0.), (.2, .1)), lane_half_width=.085))
         self.assertTrue(hit(beside, lane_path=lane, lane_half_width=math.nan))
 
     def test_lane_filter_never_hides_the_commanded_arc_or_planned_path(self):
         body = ((-.08, -.06), (.06, -.06), (.06, .06), (-.08, .06))
         arc, guard = steering_corridor(.1125, 2.873239, .1)
         on_arc = arc[-1]
-        lane = ((.3, 0.), (.4, 0.))   # lane far from the arc: filter would drop the point
+        lane = ((.05, -.3), (.1, -.4))   # lane far from the arc: a filtered arc check would drop the point
         self.assertTrue(self.scan([math.hypot(*on_arc)], angle_min=math.atan2(on_arc[1], on_arc[0]),
                                   path=((0., 0.), (.1125, 0.)), footprint=body, radius=.11,
                                   steering_path=arc, steering_guard=guard,
