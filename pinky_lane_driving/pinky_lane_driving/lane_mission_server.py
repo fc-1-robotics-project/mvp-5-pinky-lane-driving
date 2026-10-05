@@ -19,6 +19,7 @@ from rclpy.qos import qos_profile_sensor_data
 from std_msgs.msg import Bool, String
 from std_srvs.srv import SetBool
 
+from .exit_telemetry import OdomStationarity
 from .mission_guard import MissionGuard
 
 
@@ -37,6 +38,7 @@ class LaneMissionServer(Node):
             self.declare_parameter(key, value)
         self.lock = RLock()
         self.guard = MissionGuard()
+        self.odom_stationarity = OdomStationarity()
         self.goal_active = False
         self.arm_requested = False
         self.renewal = None
@@ -62,7 +64,7 @@ class LaneMissionServer(Node):
         self.create_subscription(String, 'drive/mode_status', self._mode_callback, qos_profile_sensor_data)
         self.create_subscription(Twist, 'cmd_vel', lambda m: self._note('velocity', (m.linear.x, m.angular.z)), qos_profile_sensor_data)
         self.create_subscription(Bool, 'lane/estop', lambda m: self._note('estop', m.data), qos_profile_sensor_data)
-        self.create_subscription(Odometry, 'odom', lambda m: self._note('pose', (m.pose.pose.position.x, m.pose.pose.position.y)), qos_profile_sensor_data)
+        self.create_subscription(Odometry, 'odom', self._odom_callback, qos_profile_sensor_data)
         self.create_subscription(RobotHeartbeat, 'fleet/heartbeat', lambda m: self._note('gate', dict(permit_fresh=m.permit_fresh, mode=m.gate_mode)), 10)
         self.timer = self.create_timer(.2, self._tick)
         self.action_server = ActionServer(self, FollowLane, self._topic('action_name'),
@@ -77,6 +79,41 @@ class LaneMissionServer(Node):
     def _note(self, key, value):
         with self.lock:
             self.guard.note(key, value, time.monotonic())
+
+    def _odom_callback(self, message):
+        p, q = message.pose.pose.position, message.pose.pose.orientation
+        twist = message.twist.twist
+        stamp = message.header.stamp.sec + message.header.stamp.nanosec / 1e9
+        age = self.get_clock().now().nanoseconds / 1e9 - stamp
+        if (message.header.frame_id != 'odom' or message.child_frame_id != 'base_footprint'
+                or not all(math.isfinite(v) for v in (q.x, q.y, q.z, q.w))
+                or abs(q.x*q.x + q.y*q.y + q.z*q.z + q.w*q.w - 1.) > .01):
+            age = math.inf
+        yaw = math.atan2(2*(q.w*q.z + q.x*q.y), 1-2*(q.y*q.y + q.z*q.z))
+        now = time.monotonic()
+        with self.lock:
+            self.guard.note('pose', (p.x, p.y), now)
+            self.odom_stationarity.update((p.x, p.y, yaw),
+                                          (twist.linear.x, twist.linear.y, twist.angular.z),
+                                          stamp, now, age)
+
+    def _exit_status(self, now):
+        diagnostic = self.guard.values.get('diagnostic', {})
+        elapsed = now - self.guard.received.get('diagnostic', -math.inf)
+        age = diagnostic.get('observation_age_s')
+        observation = diagnostic.get('boundary_observation')
+        fault = diagnostic.get('fault', '')
+        non_path_fault = bool(fault) and not str(fault).startswith('lane:')
+        return dict(version=1, boundaries=observation,
+                    observation_age_s=(age + elapsed if isinstance(age, (int, float))
+                                       and math.isfinite(age + elapsed) else None),
+                    stationary_s=self.odom_stationarity.duration(now),
+                    sensors_ok=not bool(self.guard.sensor_problem(now)) and not non_path_fault,
+                    obstacle=diagnostic.get('scan_hit') is True,
+                    control_reason=self.last_reason,
+                    gate_run=(self.guard.fresh('gate', now)
+                              and self.guard.values['gate']['permit_fresh']
+                              and self.guard.values['gate']['mode'] == 1))
 
     def _diagnostic_callback(self, message):
         try:
@@ -126,12 +163,14 @@ class LaneMissionServer(Node):
                 return
             self.last_status_sent = now
             ready, reason = self.guard.readiness(now)
-            data = dict(state=self.state, detail=self.detail, active=self.goal_active,
+            data = dict(status_time_s=self.get_clock().now().nanoseconds / 1e9,
+                        state=self.state, detail=self.detail, active=self.goal_active,
                         mission_id=self.mission_id, ready=ready, readiness_reason=reason,
                         cleanup_ok=self.cleanup_ok, distance_m=round(self.guard.distance, 4),
                         mode=self.guard.values.get('mode', 'UNKNOWN'),
                         lane_reason=self.guard.values.get('diagnostic', {}).get('lane_reason'),
                         counts=dict(self.guard.counts),
+                        exit_status=self._exit_status(now),
                         permission_enabled=self.guard.values.get('estop') is False)
         self.status_publisher.publish(String(data=json.dumps(data, allow_nan=False)))
 

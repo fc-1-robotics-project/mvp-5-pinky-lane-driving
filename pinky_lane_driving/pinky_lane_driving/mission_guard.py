@@ -44,7 +44,8 @@ class MissionGuard:
         if not self.fresh('diagnostic', now):
             return 'diagnostics_stale'
         d = self.values['diagnostic']
-        for name, limit in [('capture_age_s', 1.1), ('scan_age_s', .3), ('odom_age_s', .3)]:
+        for name, limit in [('observation_age_s' if 'observation_age_s' in d else 'capture_age_s', 1.1),
+                            ('scan_age_s', .3), ('odom_age_s', .3)]:
             age = d.get(name)
             if not finite(age) or not 0 <= age <= limit:
                 return name + '_stale'

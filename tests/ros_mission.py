@@ -53,6 +53,32 @@ class LaneMissionTest(unittest.TestCase):
         self.wait(lambda: self.client.server_is_ready() and self.server.local.service_is_ready()
                   and self.server.safety.service_is_ready() and self.server.watchdog.service_is_ready())
 
+    def test_exit_report_carries_observation_and_actual_odom_evidence(self):
+        server = self.server
+        now = time.monotonic()
+        with server.lock:
+            server.guard.note('diagnostic', dict(boundary_observation=dict(left_visible=False, right_visible=False),
+                observation_age_s=.1, capture_age_s=None, scan_age_s=.1, odom_age_s=.1,
+                scan_coverage_ok=True, scan_hit=False), now)
+            server.guard.note('gate', dict(permit_fresh=True, mode=1), now)
+            server.last_reason = 'sensor_failure'
+        odom = Odometry()
+        odom.header.stamp = server.get_clock().now().to_msg()
+        odom.header.frame_id, odom.child_frame_id = 'odom', 'base_footprint'
+        odom.pose.pose.orientation.w = 1.
+        server._odom_callback(odom)
+        status = server._exit_status(time.monotonic())
+        self.assertEqual(status['version'], 1)
+        self.assertTrue(status['sensors_ok'])
+        self.assertTrue(status['gate_run'])
+        self.assertFalse(status['boundaries']['left_visible'])
+        self.assertIsNotNone(status['stationary_s'])
+        self.assertGreaterEqual(status['observation_age_s'], .1)
+        odom.header.stamp = server.get_clock().now().to_msg()
+        odom.twist.twist.angular.z = .1
+        server._odom_callback(odom)
+        self.assertIsNone(server._exit_status(time.monotonic())['stationary_s'])
+
     def tearDown(self):
         self.executor.shutdown()
         self.client.destroy()
