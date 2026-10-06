@@ -13,7 +13,7 @@ experiments. Keep ROS packages at the repository root:
   hardware-facing nodes.
 - `tests/`: hardware-free Python tests; `.agents/tools/`: repository validation scripts.
 - `.agents/`: shared harness code and configuration for coding agents.
-  `CLAUDE.md` imports this file so project guidance has a single source.
+  `CLAUDE.md` is a symlink to this file so project guidance has a single source.
 - `doc/`, `README.md`, and `PROJECT.md`: user documentation and lane-driving scope.
 
 ## Build, Test, and Development
