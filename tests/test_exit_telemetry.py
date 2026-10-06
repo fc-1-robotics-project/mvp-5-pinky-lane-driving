@@ -46,6 +46,16 @@ class ExitTelemetryTest(unittest.TestCase):
         tracker.update((0., 0., 0.), (0., 0., 0.), 2.2, 4.2, .4)
         self.assertIsNone(tracker.duration(4.2))
 
+    def test_motion_to_stop_starts_timer_without_three_mm_position_change(self):
+        tracker = OdomStationarity()
+        for moving_velocity in ((.09, 0., 0.), (0., 0., .1)):
+            tracker.update((0., 0., 0.), moving_velocity, 10., 10., 0.)
+            self.assertIsNone(tracker.duration(10.))
+            for index in range(1, 82):
+                now = 10. + index * .05
+                tracker.update((.001, 0., 0.), (0., 0., 0.), now, now, 0.)
+            self.assertAlmostEqual(tracker.duration(now), 4.)
+
     def test_valid_empty_frame_uses_lane_loss_timer_not_camera_fault_timer(self):
         helper = test_mission_guard.MissionGuardTest()
         guard = helper.ready()

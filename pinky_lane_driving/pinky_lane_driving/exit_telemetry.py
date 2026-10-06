@@ -34,7 +34,7 @@ class OdomStationarity:
                  and abs(velocity[2]) < .02)
         moved = (self.anchor is None or math.dist(pose[:2], self.anchor[:2]) >= .003
                  or abs(math.remainder(pose[2] - self.anchor[2], 2 * math.pi)) >= .02)
-        if not still or not continuous or moved:
+        if not still or not continuous or moved or self.since is None:
             self.anchor = pose if valid else None
             self.since = now if still else None
         self.stamp, self.received = stamp, now
