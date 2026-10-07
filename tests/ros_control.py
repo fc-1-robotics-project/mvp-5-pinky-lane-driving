@@ -77,6 +77,29 @@ class RosControlTest(unittest.TestCase):
         self.scan_overrides = {}
         self.timer = self.probe.create_timer(.03, self.publish_sensors)
 
+    def test_exit_visibility_distinguishes_empty_frame_from_invalid_or_old_frame(self):
+        c = self.controller
+        c.tf_pose = Mock(return_value=(0., 0., 0.))
+        stamp = c.get_clock().now().nanoseconds / 1e9
+        frame = observation(stamp)
+        for detection in frame['detections']:
+            detection.update(confidence=.9, polygon_px=((0., 0.), (2., 0.), (2., 2.)))
+        c.observe(String(data=json.dumps(frame)))
+        self.assertEqual(c.exit_observation, dict(left_visible=True, right_visible=True))
+        frame['capture_time_s'] = c.get_clock().now().nanoseconds / 1e9
+        frame['detections'] = []
+        c.observe(String(data=json.dumps(frame)))
+        self.assertEqual(c.exit_observation, dict(left_visible=False, right_visible=False))
+        self.assertIsNotNone(c.exit_capture_stamp)
+        # Duplicate source frames and malformed/stale frames are not exit evidence.
+        c.observe(String(data=json.dumps(frame)))
+        self.assertIsNone(c.exit_observation)
+        frame['capture_time_s'] -= 5.
+        c.observe(String(data=json.dumps(frame)))
+        self.assertIsNone(c.exit_observation)
+        c.observe(String(data='{}'))
+        self.assertIsNone(c.exit_capture_stamp)
+
     def tearDown(self):
         self.executor.shutdown()
         for node in (self.controller, self.watchdog, self.probe):

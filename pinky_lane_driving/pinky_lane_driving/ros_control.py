@@ -25,6 +25,7 @@ from .control import Limits, Proposal, command
 from .crosswalk import CrosswalkTracker
 from .obstacles import convex_footprint, scan_collision, steering_corridor, stopping_corridor, transform_points, validate_self_filter, validate_self_radius
 from .path import PathSettings
+from .exit_telemetry import boundary_visibility
 from .runtime import DriveCore
 from .tracking import LaneTracker, relative_pose
 
@@ -112,6 +113,8 @@ class ControlNode(Node):
         self.last_reason = None
         self.last_diagnostic_time = -math.inf
         self.observation_error = 'No observation received'
+        self.exit_observation = None
+        self.exit_capture_stamp = None
         self.publisher = self.create_publisher(String, 'lane/command', 1)
         self.diagnostic_publisher = self.create_publisher(String, 'lane/diagnostics', 1)
         sensor_qos = QoSProfile(depth=1, reliability=ReliabilityPolicy.BEST_EFFORT)
@@ -162,6 +165,7 @@ class ControlNode(Node):
 
     def observe(self, message):
         now = self.get_clock().now().nanoseconds / 1e9
+        self.exit_observation = self.exit_capture_stamp = None
         try:
             if len(message.data) > 8_000_000:
                 raise ValueError('Oversized observation')
@@ -172,6 +176,13 @@ class ControlNode(Node):
             pose = self.tf_pose('odom', 'base_footprint', stamp)
             self.core.observe(observation, now=now, pose=pose)
             self.observation_error = None
+            # Telemetry only: do not change path selection or driving commands.
+            if self.core.tracker.last_stamp == stamp:
+                try:
+                    self.exit_observation = boundary_visibility(observation)
+                    self.exit_capture_stamp = stamp
+                except (ValueError, TypeError, KeyError, IndexError):
+                    pass
         except (ValueError, TypeError, KeyError, TransformException, OverflowError) as error:
             self.observation_error = str(error)
             self.core.observe({}, now=now, pose=None)
@@ -320,6 +331,9 @@ class ControlNode(Node):
                               raw_scan_hit=hit,
                               lidar_obstacle_stop_enabled=self.core.lidar_obstacle_stop_enabled,
                               emergency=emergency)
+            diagnostic['boundary_observation'] = self.exit_observation
+            diagnostic['observation_age_s'] = (None if self.exit_capture_stamp is None
+                                               else now - self.exit_capture_stamp)
             diagnostic['tf_odom_rewind_s'] = (stamp_seconds(self.odom[0]) - stamp_seconds(selected_odom)
                                               if self.odom and selected_odom is not None else None)
             diagnostic['tf_scan_rewind_s'] = (stamp_seconds(self.scan[0]) - stamp_seconds(selected_scan)

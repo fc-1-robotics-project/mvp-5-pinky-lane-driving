@@ -1,9 +1,9 @@
 # 새 로봇 설치·기존 로봇 업데이트
 
-**로봇과 관제 PC 모두 `codex/lane-field-20261001` 브랜치로 설치합니다.**
+**로봇과 관제 PC 모두 `codex/two-robot-demo-20261005` 브랜치로 설치합니다.**
 
-- 로봇: [jsh0116/pinky-lane-driving](https://github.com/jsh0116/pinky-lane-driving/tree/codex/lane-field-20261001)
-- 관제: [INYUP-BAEK/pinky-fleet-control](https://github.com/INYUP-BAEK/pinky-fleet-control/blob/codex/lane-field-20261001/TEAM_LANE_GUIDE.md)
+- 로봇: [jsh0116/pinky-lane-driving](https://github.com/fc-1-robotics-project/mvp-5-pinky-lane-driving/tree/codex/two-robot-demo-20261005)
+- 관제: [INYUP-BAEK/pinky-fleet-control](https://github.com/fc-1-robotics-project/mvp-5-pinky-fleet-control/blob/codex/two-robot-demo-20261005/TEAM_LANE_GUIDE.md)
 - 설치 후 실행·UI 사용·종료: [UI_INTEGRATION.md](UI_INTEGRATION.md)
 
 ## 1. 준비할 장비·파일
@@ -18,7 +18,7 @@
 
 ROS가 없으면 먼저 [ROS Jazzy 공식 Ubuntu 설치 안내](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)를 따릅니다. ROS 저장소가 등록된 뒤 로봇은 `ros-jazzy-ros-base`로 시작할 수 있고, 아래 rosdep으로 필요한 실행 패키지를 설치합니다.
 
-현재 공유 프로필은 **차선 속도 0.06m/s, 횡단보도 정지 OFF, 차선의 라이다 물체 자동 정지 OFF**입니다. 0.06m/s 실제 주행은 미검증이며 새 기체도 현장 점검이 필요합니다. 차선 외 Nav2 속도/장애물 설정은 `pinky_navigation/params/nav2_params.yaml`의 별도 설정입니다.
+현재 공유 프로필은 **기본/최대/한쪽 보완 0.09m/s, 차선 소실 유지/횡단보도 감속 0.06m/s, 횡단보도 정지 OFF, 라이다 물체 정지 ON**입니다. 전체 통합 시연 완주는 미확인이고 새 기체도 현장 점검이 필요합니다. 차선 외 Nav2 속도/장애물 설정은 `pinky_navigation/params/nav2_params.yaml`의 별도 설정입니다.
 
 기준 하드웨어는 모터 `/dev/ttyAMA4`, C1 라이다 `/dev/ttyAMA0`, OV5647 카메라 640×480·orientation 180입니다. `ls -l /dev/ttyAMA{0,4}`와 `id`로 포트·접근 그룹을 확인합니다. 포트가 다르면 `pinky_bringup/config/pinky_params.yaml`과 `pinky_bringup/launch/bringup_robot.launch.xml`을 실제 장비에 맞춥니다. 기구 치수/TF는 `pinky_description`도 함께 확인합니다.
 
@@ -33,8 +33,8 @@ sudo apt install git python3-colcon-common-extensions python3-rosdep \
   ros-jazzy-camera-info-manager
 source /opt/ros/jazzy/setup.bash
 mkdir -p ~/pinky_robot_ws/src
-git clone --branch codex/lane-field-20261001 \
-  https://github.com/jsh0116/pinky-lane-driving.git \
+git clone --branch codex/two-robot-demo-20261005 \
+  https://github.com/fc-1-robotics-project/mvp-5-pinky-lane-driving.git \
   ~/pinky_robot_ws/src/pinky-lane-driving
 # 처음 사용하는 장비에서만, rosdep이 초기화되지 않았다면 실행:
 # sudo rosdep init
@@ -64,7 +64,7 @@ source ~/camera_ws/install/setup.bash
 
 ### 추론 환경
 
-현재 로봇에서 확인한 버전(2026-10-03):
+현재 로봇에서 확인한 버전(2026-10-06):
 
 | 패키지 | 버전 |
 |---|---|
@@ -153,7 +153,7 @@ cp -n ~/pinky_robot_ws/src/pinky-lane-driving/pinky_lane_driving/config/lane_con
   ~/pinky_calibration/lane_control_lane_only.json
 ```
 
-지도와 모델은 별도 전달 파일입니다. 코드만 clone하면 현장 지도/모델까지 설치되는 것은 아닙니다. 두 로봇을 같은 UI에서 운용할 때는 동일한 `map` 좌표계의 지도를 사용합니다.
+저장소에는 `pinky_navigation/map/261003.yaml`과 대응 PGM이 포함됩니다. 새 현장 지도와 모델은 별도 준비하며, 포함된 지도를 그대로 쓸 때도 실제 현장과 일치하는지 확인합니다. 두 로봇을 같은 UI에서 운용할 때는 동일한 `map` 좌표계의 지도를 사용합니다.
 
 ### 새 기체 보정
 
@@ -169,7 +169,7 @@ ros2 run pinky_lane_driving lane_calibrate_ground \
   --output "$HOME/pinky_calibration/new_calibrated.json"
 ```
 
-생성기는 제어 설정까지 만듭니다. **측정 YAML의 초기 튜닝값은 현장 프로필과 다릅니다.** 생성 파일 전체로 운용 JSON을 덮어쓰지 말고 위 보정 항목만 반영합니다. 현장 프로필의 네 속도는 0.06m/s, `min_lookahead=0.10`, `steering_gain=1.2`, 영상 신선도 1.1초, 명령 무응답 0.2초입니다. 기체별 미확인 항목이 있으면 먼저 정지·센서·비상정지 점검을 마칩니다.
+생성기는 제어 설정까지 만듭니다. **측정 YAML의 초기 튜닝값은 현장 프로필과 다릅니다.** 생성 파일 전체로 운용 JSON을 덮어쓰지 말고 위 보정 항목만 반영합니다. 현장 프로필은 cruise/max/fallback 0.09m/s, blind/approach 0.06m/s, `min_lookahead=0.10`, `steering_gain=1.2`, 영상 신선도 1.1초, 명령 무응답 0.2초입니다. 기체별 미확인 항목이 있으면 먼저 정지·센서·비상정지 점검을 마칩니다.
 
 ## 6. 로봇 이름·네트워크·첫 실행
 
@@ -194,37 +194,25 @@ cd ~/pinky_robot_ws/src/pinky-lane-driving
 git status --short
 # 변경이 있으면 보관·커밋한 뒤 진행합니다. 강제 reset은 하지 않습니다.
 git fetch origin
-git switch codex/lane-field-20261001
-git pull --ff-only origin codex/lane-field-20261001
+git switch codex/two-robot-demo-20261005
+git pull --ff-only origin codex/two-robot-demo-20261005
 source /opt/ros/jazzy/setup.bash
 source ~/camera_ws/install/setup.bash
 cd ~/pinky_robot_ws
 colcon build --symlink-install --packages-up-to pinky_robot_system
 ```
 
-홈의 운용 JSON은 Git 업데이트로 바뀌지 않습니다. 기존 0.03 프로필을 현재 **0.06 차선 시험 프로필**로 전환할 때 실제 사용하는 파일을 지정하고 다음을 한 번 실행합니다. 보정값은 유지하고 원본을 백업합니다.
+홈의 운용 JSON은 Git 업데이트로 바뀌지 않습니다. 실행 인자의 실제 JSON과 저장소 프로필을 비교합니다. 기체별 `calibration`, `mounting_id`, `path.width`, 차체 polygon/TF는 유지하고, 속도와 기능 설정은 아래 표를 확인해 필요한 항목만 반영합니다. 수정 전 운용 파일을 백업합니다.
 
-```bash
-export PINKY_LANE_CONFIG="$HOME/pinky_calibration/lane_control_lane_only.json"
-# 기존 시험 기체라면 lane_control_lane_only_verified_20261001.json을 지정
-python3 - <<'PY'
-from pathlib import Path
-from datetime import datetime
-import json, os, shutil
-p = Path(os.environ['PINKY_LANE_CONFIG'])
-c = json.loads(p.read_text())
-shutil.copy2(p, p.with_name(p.name + '.before06_' + datetime.now().strftime('%Y%m%d_%H%M%S')))
-for group, key in [('behavior', 'cruise_speed'), ('control', 'max_speed'),
-                   ('path', 'fallback_speed'), ('path', 'blind_speed')]:
-    c[group][key] = 0.06
-c['crosswalk_control_enabled'] = False
-c['lidar_obstacle_stop_enabled'] = False
-p.write_text(json.dumps(c, indent=2) + '\n')
-print('Updated:', p)
-PY
-```
+| 항목 | 현재 저장소 값 |
+|---|---|
+| `behavior.cruise_speed`, `control.max_speed`, `path.fallback_speed` | 0.09m/s |
+| `path.blind_speed`, `behavior.approach_speed` | 0.06m/s |
+| `crosswalk_control_enabled` / `behavior.crosswalk_stop` | true / false (감속 통과) |
+| `lidar_obstacle_stop_enabled` | true |
+| `control.min_lookahead` / `control.steering_gain` | 0.10m / 1.2 |
 
-워치독·임무 서버의 0.06 제한은 같은 브랜치 코드에 포함됩니다. JSON만 바꾸고 예전 바이너리를 실행하면 제한 불일치가 생깁니다. 빌드 후 새 터미널에서 source하고 실행합니다.
+`lane_control.json`과 `lane_control_lane_only.json`은 현재 같은 운용 값입니다. 파일명보다 내용을 기준으로 선택합니다. 차선 launch 워치독과 임무 서버의 상한은 0.09m/s이며 JSON만 증속하면 설정 불일치/속도 초과로 중단될 수 있습니다. 빌드 후 새 터미널에서 source하고 실행합니다. 세부 코드 설명은 [통합 시연용 상태 문서](doc/two_robot_demo_status.md)를 참고합니다.
 
 ## 8. 검사와 검증 범위
 
@@ -236,6 +224,6 @@ source ~/camera_ws/install/setup.bash
 ./.agents/tools/harness.sh ros pinky_robot_system pinky_lane_driving pinky_fleet_safety
 ```
 
-2026-10-03 확인: 로컬 알고리즘/감시 검사 139개, 실제 로봇 설치 환경 검사 138개, 격리 ROS 임무 검사 8개 통과. 0.06 속도 허용·초과 차단·허가 해제를 검사했습니다. 실제 로봇에 파일/설정 적용 및 패키지 빌드는 완료됐습니다. **0.06 실주행, 새 기체의 주행, 새 OS의 전체 설치는 미검증**입니다. 이전 0.03 실험의 출구 도착 확인과 구분합니다.
+2026-10-06 하드웨어 없는 알고리즘/감시 검사 **152개 통과**. 두 실제 로봇에 현재 소스 적용 및 실행용 14개 패키지 빌드를 완료했습니다. 이후 현장 통합 시연에서는 A 최종 Nav2 진행 중 관제 복구 대기가 두 로봇을 함께 멈추는 문제가 확인됐습니다. 전체 완주, 새 기체의 주행, 새 OS의 전체 설치는 검증 완료로 주장하지 않습니다. 격리 ROS 제어·임무 검사 25개도 통과했습니다. harness의 전체 결과 집계는 이전 Navigation lint/XML 실패 기록 때문에 실패했으며 전체 ROS 검사 통과와 구분합니다. 최신 패키지 검사 결과와 상태 계약은 `doc/two_robot_demo_status.md`를 확인합니다.
 
 확인할 상태는 `single_boundary`, `recent_path_no_boundaries`, `no_current_lane`, `lane_observation_stale`, 실제 이동 거리·종료 이유입니다. 자동 영상/rosbag/CSV 수집 기능은 없습니다. `tools/field_test/pinky_stationary_probe.py`는 선택적 정지 진단용이고 정상 운용은 UI에서 합니다.
