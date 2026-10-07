@@ -11,9 +11,28 @@
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
   <test_depend>python3-pytest</test_depend>
+  <test_depend>python3-yaml</test_depend>
 
   <depend>tf_transformations</depend>
+  <exec_depend>camera_ros</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>pinky_fleet_safety</exec_depend>
+  <exec_depend>pinky_led</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+  <exec_depend>python3-yaml</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
   
+  <exec_depend>dynamixel_sdk</exec_depend>
+
+  <exec_depend>pinky_description</exec_depend>
+
+  <exec_depend>sllidar_ros2</exec_depend>
+
+  <exec_depend>tf2_ros</exec_depend>
+
   <export>
     <build_type>ament_python</build_type>
   </export>

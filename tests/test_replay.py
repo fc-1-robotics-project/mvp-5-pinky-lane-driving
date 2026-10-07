@@ -4,11 +4,31 @@
 
 import math
 import unittest
+from types import SimpleNamespace
 
 from tools.replay import frame_plan, validate_model
+from tools.replay import observe_result
 
 
 class ReplayTest(unittest.TestCase):
+    def test_model_adapter_preserves_source_time_and_instances(self):
+        class Values(list):
+            def tolist(self):
+                return list(self)
+
+        result = SimpleNamespace(
+            orig_shape=(480, 640),
+            boxes=SimpleNamespace(cls=Values([0., 1., 1.]), conf=Values([.9] * 3)),
+            masks=SimpleNamespace(xy=[Values([(10., 20.), (30., 20.), (20., 40.)])] * 3))
+        row = observe_result(result, 133.)
+        self.assertEqual(row['capture_time_s'], 133.)
+        self.assertEqual(row['image_size'], (640, 480))
+        self.assertEqual(len(row['detections']), 3)
+        self.assertFalse(row['metric_valid'])
+        result.masks = None
+        with self.assertRaises(ValueError):
+            observe_result(result, 133.)
+
     def test_half_open_window_and_original_timing(self):
         frames, rate = frame_plan(30., 9000, 133., 136., 5.)
         self.assertEqual(list(frames), list(range(3990, 4080, 6)))

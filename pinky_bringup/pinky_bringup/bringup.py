@@ -42,9 +42,16 @@ class Pinky(Node):
         
         self.declare_parameter('wheel_radius', 0.027)
         self.declare_parameter('wheel_separation', 0.0961)
+        self.declare_parameter('command_timeout_sec', 0.3)
         
         self.wheel_radius = self.get_parameter('wheel_radius').get_parameter_value().double_value
         self.wheel_separation = self.get_parameter('wheel_separation').get_parameter_value().double_value
+        self.command_timeout_sec = (
+            self.get_parameter('command_timeout_sec')
+            .get_parameter_value().double_value
+        )
+        if self.command_timeout_sec <= 0.0:
+            raise ValueError('command_timeout_sec must be greater than zero')
         
         self.get_logger().info(f'Wheel radius: {self.wheel_radius}')
         self.get_logger().info(f'Wheel separation: {self.wheel_separation}')
@@ -86,6 +93,8 @@ class Pinky(Node):
         self.twist_sub = self.create_subscription(Twist, TWIST_SUB_TOPIC_NAME, self.twist_callback, 10)
         self.tf_broadcaster = TransformBroadcaster(self)
         self.timer = self.create_timer(1.0 / 30.0, self.update_and_publish)
+        self.last_command_time = None
+        self.command_watchdog_active = False
 
         self.battery_sub = self.create_subscription(
             Float32,
@@ -123,8 +132,15 @@ class Pinky(Node):
 
         if not self.driver.set_double_rpm(rpm_l, rpm_r):
             self.get_logger().warn("Failed to send motor command.")
+            return
+
+        self.last_command_time = time.monotonic()
+        self.command_watchdog_active = (
+            abs(linear_x) >= 1e-9 or abs(angular_z) >= 1e-9
+        )
 
     def update_and_publish(self):
+        self._enforce_command_watchdog()
         current_time = self.get_clock().now()
         dt = (current_time - self.last_time).nanoseconds / 1e9
         if dt <= 0: return
@@ -159,6 +175,22 @@ class Pinky(Node):
         self._publish_joint_states(current_time, rpm_l, rpm_r)
 
         self.last_time = current_time
+
+    def _enforce_command_watchdog(self):
+        if not self.command_watchdog_active or self.last_command_time is None:
+            return
+        if time.monotonic() - self.last_command_time < self.command_timeout_sec:
+            return
+
+        if self.driver.set_double_rpm(0, 0):
+            self.get_logger().error(
+                'cmd_vel timeout: stopped the motors locally.'
+            )
+            self.command_watchdog_active = False
+        else:
+            self.get_logger().error(
+                'cmd_vel timeout: failed to send the motor stop command.'
+            )
 
     def _publish_tf(self, current_time):
         t = TransformStamped()
