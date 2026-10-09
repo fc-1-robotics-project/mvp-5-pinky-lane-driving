@@ -18,7 +18,7 @@
 
 ROS가 없으면 먼저 [ROS Jazzy 공식 Ubuntu 설치 안내](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html)를 따릅니다. ROS 저장소가 등록된 뒤 로봇은 `ros-jazzy-ros-base`로 시작할 수 있고, 아래 rosdep으로 필요한 실행 패키지를 설치합니다.
 
-현재 공유 프로필은 **기본/최대/한쪽 보완 0.09m/s, 차선 소실 유지/횡단보도 감속 0.06m/s, 횡단보도 정지 OFF, 라이다 물체 정지 ON**입니다. 전체 통합 시연 완주는 미확인이고 새 기체도 현장 점검이 필요합니다. 차선 외 Nav2 속도/장애물 설정은 `pinky_navigation/params/nav2_params.yaml`의 별도 설정입니다.
+현재 공유 프로필은 **기본/최대/한쪽 보완 0.09m/s, 차선 소실 유지/횡단보도 접근·통과 0.06m/s, 횡단보도 정지 ON (odom 정지 확인 후 2초 대기·재출발), 라이다 물체 정지 ON**입니다. 전체 통합 시연 완주는 미확인이고 새 기체도 현장 점검이 필요합니다. 차선 외 Nav2 속도/장애물 설정은 `pinky_navigation/params/nav2_params.yaml`의 별도 설정입니다.
 
 기준 하드웨어는 모터 `/dev/ttyAMA4`, C1 라이다 `/dev/ttyAMA0`, OV5647 카메라 640×480·orientation 180입니다. `ls -l /dev/ttyAMA{0,4}`와 `id`로 포트·접근 그룹을 확인합니다. 포트가 다르면 `pinky_bringup/config/pinky_params.yaml`과 `pinky_bringup/launch/bringup_robot.launch.xml`을 실제 장비에 맞춥니다. 기구 치수/TF는 `pinky_description`도 함께 확인합니다.
 
@@ -208,7 +208,7 @@ colcon build --symlink-install --packages-up-to pinky_robot_system
 |---|---|
 | `behavior.cruise_speed`, `control.max_speed`, `path.fallback_speed` | 0.09m/s |
 | `path.blind_speed`, `behavior.approach_speed` | 0.06m/s |
-| `crosswalk_control_enabled` / `behavior.crosswalk_stop` | true / false (감속 통과) |
+| `crosswalk_control_enabled` / `behavior.crosswalk_stop` | true / true (정지 확인 후 2초 대기·재출발) |
 | `lidar_obstacle_stop_enabled` | true |
 | `control.min_lookahead` / `control.steering_gain` | 0.10m / 1.2 |
 

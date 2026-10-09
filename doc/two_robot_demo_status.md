@@ -77,7 +77,7 @@ python3 -m unittest ros_control ros_mission -v
 |---|---|
 | `behavior.cruise_speed`, `control.max_speed`, `path.fallback_speed` | 0.09m/s |
 | `path.blind_speed`, `behavior.approach_speed` | 0.06m/s |
-| `crosswalk_control_enabled`, `behavior.crosswalk_stop` | true, false (감속 통과) |
+| `crosswalk_control_enabled`, `behavior.crosswalk_stop` | true, true (정지 확인 후 2초 대기·재출발) |
 | `lidar_obstacle_stop_enabled` | true |
 | `control.min_lookahead`, `control.steering_gain`, `control.max_omega` | 0.10m, 1.2, 0.6rad/s |
 

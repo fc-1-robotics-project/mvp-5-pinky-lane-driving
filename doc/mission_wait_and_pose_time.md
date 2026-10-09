@@ -10,7 +10,8 @@
 설명 없는 제로 출력의 15초 감시, 차선 소실 15초 감시, 센서 고장 2초 감시,
 이동 명령에도 odom 진행이 없는 6초 감시, 임무의 `max_duration_sec`는 유지한다.
 센서·TF 오류, E-stop, permit/로컬 허가 소실, 속도 제한, watchdog도 유지한다.
-횡단보도 정지 설정 자체는 바꾸지 않았다.
+두 기본 프로필은 `behavior.crosswalk_stop=true`로 횡단보도 앞 정지를 활성화했다.
+기존 0.15m 정지 기준과 odom 속도 0.01m/s 이하 확인, 2초 대기 후 재출발 설정은 유지한다.
 
 `fleet/pose.header.stamp`는 발행 시각이 아니라 `map → base_footprint` 조회 결과의
 원본 TF 시각이다. 0·음수·미래·잘못된 나노초·`transform_stale_sec` 초과 TF는 발행하지 않는다.
