@@ -82,6 +82,21 @@ class MissionGuard:
             return False
         return now - self.holds.setdefault(key, now) >= seconds
 
+    def intentional_wait(self, diagnostic, sensor_problem):
+        """A fresh matching behavior decision may pause, never a path/sensor fault."""
+        reason = self.values.get('command')
+        if (sensor_problem or diagnostic.get('lane_valid') is not True
+                or diagnostic.get('emergency') is not False
+                or diagnostic.get('fault')
+                or diagnostic.get('reason') != reason):
+            return False
+        if reason == 'obstacle':
+            return diagnostic.get('scan_hit') is True
+        if diagnostic.get('scan_hit') is not False:
+            return False
+        return (reason == 'clear_hold' or reason == 'crosswalk'
+                and diagnostic.get('behavior_state') in ('APPROACH', 'WAIT'))
+
     def fault(self, now):
         if not self.fresh('gate', now) or not self.values['gate']['permit_fresh']:
             return 'central_connection_lost'
@@ -114,7 +129,8 @@ class MissionGuard:
         lane_bad = not problem and d.get('lane_valid') is not True
         if self.sustained('lane', lane_bad, now, 15.):
             return 'persistent_lane_loss'
-        if self.sustained('zero', abs(v) < .002 and abs(w) < .01, now, 15.):
+        waiting = self.intentional_wait(d, problem)
+        if self.sustained('zero', not waiting and abs(v) < .002 and abs(w) < .01, now, 15.):
             return 'persistent_stop'
         if not self.fresh('pose', now, .5):
             return 'odom_stale'
@@ -132,7 +148,7 @@ class MissionGuard:
         if abs(v) < .002:
             # An obstacle/clear-hold explicitly commands no forward movement.
             # Do not carry that waiting time into the next motion attempt.
-            # The independent 15 s persistent-stop timer above still applies.
+            # The 15 s timer still applies to unexplained zero commands.
             self.last_progress = now
         if abs(v) >= .002 and now - self.last_progress >= 6.:
             return 'no_odom_progress'
