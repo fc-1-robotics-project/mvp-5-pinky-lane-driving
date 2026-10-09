@@ -1,14 +1,14 @@
 # Pinky Nav2·차선 통합 운용
 
-**공유 브랜치: `codex/two-robot-demo-20261005` · 기준일: 2026-10-06**
+**작업 브랜치: `feature/mission-recovery-position-20261009` · 기준: `origin/develop` · 기준일: 2026-10-09**
 
 1. **새 로봇 설치·보정·기존 장비 업데이트:** [TEAM_LANE_GUIDE.md](TEAM_LANE_GUIDE.md)
 2. **로봇·관제 실행·UI 사용·종료:** [UI_INTEGRATION.md](UI_INTEGRATION.md)
-3. **새 관제 PC 설치:** [관제 저장소의 같은 브랜치](https://github.com/fc-1-robotics-project/mvp-5-pinky-fleet-control/blob/codex/two-robot-demo-20261005/TEAM_LANE_GUIDE.md)
+3. **새 관제 PC 설치:** [관제 저장소의 같은 브랜치](https://github.com/fc-1-robotics-project/mvp-5-pinky-fleet-control/blob/feature/mission-recovery-position-20261009/TEAM_LANE_GUIDE.md)
 
 현재 공유본은 두 로봇 통합 시연용 `exit_status.version=1` 상태 보고와 실제 odom 정지 시간 보고를 포함합니다. 팀 `develop`에 병합된 PR #3(0.09m/s·횡단보도 감속)과 PR #4(차로 기반 라이다 보완)를 바탕으로 합니다. 기본/최대/한쪽 보완은 0.09m/s, 차선 소실 유지·횡단보도 감속은 0.06m/s이며 라이다 물체 정지는 ON입니다. 모델은 별도 준비하고 카메라/차체는 기체별로 보정합니다.
 
-[로봇 코드 흐름·상태 계약·검증 범위](doc/two_robot_demo_status.md)를 확인하세요. 대응 관제에는 전체 복구 대기가 다른 로봇까지 멈추는 미해결 문제가 있으며, 전체 통합 시연 완주는 아직 확인되지 않았습니다.
+[로봇 코드 흐름·상태 계약·검증 범위](doc/two_robot_demo_status.md)를 확인하세요. 이번 브랜치는 의도적 장애물 대기의 임무 유지와 TF 원본 시각 보존을 보완합니다. 대응 관제의 같은 feature 브랜치도 함께 적용해야 하며, [대기·위치 시각 계약](doc/mission_wait_and_pose_time.md)을 확인하세요. 코드·격리 ROS 검증을 통과했으나 수정 후 전체 통합 시연 완주는 아직 확인되지 않았습니다.
 
 아래는 원본 Pinky 범용 참고 자료입니다. **이 브랜치의 실물 통합 운용에는 위 두 가이드를 사용하세요.** 별도 bringup/Nav2를 통합 launch와 중복 실행하지 않습니다.
 
