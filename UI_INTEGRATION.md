@@ -12,10 +12,10 @@
 | 차선 소실 유지 / 횡단보도 감속 속도 | **0.06m/s** |
 | 차선 각속도 상한 / 최소 추종 거리 / 조향 배율 | 0.6rad/s / 0.10m / 1.2 |
 | 카메라 / YOLO 입력 | 640×480 / **448** |
-| 횡단보도 / 라이다 물체 자동 정지 | 인식·감속 ON, 횡단보도 정지 OFF / **라이다 정지 ON** |
+| 횡단보도 / 라이다 물체 자동 정지 | **횡단보도 정지 ON** (odom 정지 확인 후 2초 대기·재출발) / **라이다 정지 ON** |
 | 일시 인식 소실 | 측정했던 경로를 odom으로 변환해 최대 1.5초·6cm 안에서만 사용 |
 
-저장소의 `lane_control.json`과 `lane_control_lane_only.json`은 현재 같은 운용 값을 갖습니다. 파일 이름으로 기능 ON/OFF를 판단하지 않습니다. 두 프로필 모두 `crosswalk_control_enabled=true`, `behavior.crosswalk_stop=false`, `lidar_obstacle_stop_enabled=true`입니다. 횡단보도는 감속해 통과하고 라이다 물체 판정은 정지시킬 수 있습니다. PR #4는 조향 경로를 유지하면서 직진 반응 구간만 차로 내부 점으로 검사합니다. Nav2 장애물 회피는 별도 설정입니다.
+저장소의 `lane_control.json`과 `lane_control_lane_only.json`은 현재 같은 운용 값을 갖습니다. 파일 이름으로 기능 ON/OFF를 판단하지 않습니다. 두 프로필 모두 `crosswalk_control_enabled=true`, `behavior.crosswalk_stop=true`, `lidar_obstacle_stop_enabled=true`입니다. 횡단보도는 앞에서 정지한 뒤 odom 정지 확인과 2초 대기를 거쳐 재출발하며 라이다 물체 판정도 정지시킬 수 있습니다. PR #4는 조향 경로를 유지하면서 직진 반응 구간만 차로 내부 점으로 검사합니다. Nav2 장애물 회피는 별도 설정입니다.
 
 로봇 홈의 JSON은 Git 갱신으로 바뀌지 않습니다. `lane_control_config`로 지정한 실제 파일을 먼저 확인합니다. 비상정지·관제 permit·로컬 허가 만료·영상/센서 오류 점검은 유지됩니다.
 

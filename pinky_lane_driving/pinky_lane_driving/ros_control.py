@@ -318,6 +318,7 @@ class ControlNode(Node):
 
             capture_age = None if self.core.capture_stamp is None else now - self.core.capture_stamp
             diagnostic = dict(reason=result.reason, lane_valid=self.core.lane.valid,
+                              behavior_state=self.core.behavior.state,
                               lane_degraded=self.core.lane.degraded,
                               path_points_m=self.core.lane.points,
                               lane_reason=self.core.lane.reason, capture_age_s=capture_age,

@@ -11,6 +11,7 @@ from pinky_lane_driving.control import Limits
 from pinky_lane_driving.crosswalk import CrosswalkTracker
 from pinky_lane_driving.path import PathSettings
 from pinky_lane_driving.runtime import DriveCore
+from pinky_lane_driving.mission_guard import MissionGuard
 from pinky_lane_driving.tracking import LaneTracker
 from test_calibration import synthetic_config
 from test_tracking import observation
@@ -45,6 +46,35 @@ class RuntimeTest(unittest.TestCase):
         self.assertEqual(self.tick(1.08, coverage_ok=False).speed, 0.)
         self.assertEqual(self.tick(1.09, estop=True).speed, 0.)
         self.assertEqual(self.tick(1.5).speed, 0.)
+
+    def test_long_obstacle_wait_and_stable_clear_keep_mission_guard_active(self):
+        guard = MissionGuard()
+        self.core.limits = replace(self.core.limits, max_speed=.09)
+        pose = (0., 0.)
+
+        def sample(stamp, obstacle):
+            self.update(stamp)
+            result = self.tick(stamp, scan_hit=obstacle)
+            diagnostic = dict(reason=result.reason, behavior_state=self.core.behavior.state,
+                              lane_valid=self.core.lane.valid, scan_hit=obstacle,
+                              scan_coverage_ok=True, capture_age_s=0., scan_age_s=.01,
+                              odom_age_s=.01, emergency=False)
+            for key, value in dict(mode='LANE', gate=dict(permit_fresh=True, mode=1),
+                                   velocity=(result.speed, result.omega), command=result.reason,
+                                   estop=False, pose=pose, diagnostic=diagnostic).items():
+                guard.note(key, value, stamp)
+            self.assertEqual(guard.fault(stamp), '')
+            return result
+
+        # Fresh perception, lidar and odom continue throughout a 21 s wait.
+        for index in range(211):
+            result = sample(1. + index * .1, True)
+            self.assertEqual(result.speed, 0.)
+            self.assertEqual(result.reason, 'obstacle')
+        self.assertEqual(sample(22.1, False).reason, 'clear_hold')
+        restarted = sample(22.2, False)
+        self.assertEqual(restarted.reason, 'follow')
+        self.assertGreater(restarted.speed, 0.)
 
     def test_one_sided_cap_survives_final_arbitration(self):
         self.update(1.)
