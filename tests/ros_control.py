@@ -165,6 +165,7 @@ class RosControlTest(unittest.TestCase):
         self.wait(lambda: any(m.linear.x > 0 for m in self.messages))
         self.wait(lambda: bool(self.diagnostics))
         self.assertIn('lane_reason', self.diagnostics[-1])
+        self.assertEqual(self.diagnostics[-1]['behavior_state'], 'FOLLOW')
         self.send_scan = False
         self.wait_duration(.4)
         self.assertEqual(self.messages[-1].linear.x, 0.)

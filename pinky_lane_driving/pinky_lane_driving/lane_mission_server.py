@@ -130,19 +130,27 @@ class LaneMissionServer(Node):
             pass
 
     def _command_callback(self, message):
-        healthy, reason = False, 'malformed_command'
+        healthy, source_valid, reason = False, False, 'malformed_command'
         try:
             data = json.loads(message.data)
+            if not isinstance(data, dict):
+                raise ValueError('command must be an object')
             reason = data.get('reason', '')
             age = self.get_clock().now().nanoseconds / 1e9 - float(data['capture_stamp'])
-            healthy = reason in self.HEALTHY_REASONS and 0 <= age <= 1.1
+            source_valid = (0 <= age <= 1.1
+                            and all(isinstance(data.get(key), (int, float))
+                                    and not isinstance(data[key], bool)
+                                    and math.isfinite(data[key]) for key in ('speed', 'omega'))
+                            and 0 <= data['speed'] <= .09 and abs(data['omega']) <= .6)
+            healthy = reason in self.HEALTHY_REASONS and source_valid
         except (ValueError, TypeError, KeyError):
             pass
         with self.lock:
             self.ready_streak = self.ready_streak + 1 if healthy else 0
             self.last_command_received = time.monotonic()
             self.last_reason = reason
-            self.guard.note('command', reason, self.last_command_received)
+            self.guard.note('command', reason if source_valid else 'invalid_command',
+                            self.last_command_received)
 
     def _finish_callback(self, message):
         with self.lock:

@@ -1,4 +1,6 @@
-"""Publish a fresh fleet pose from the robot-local localization TF."""
+"""Publish a fleet pose preserving the robot-local localization TF time."""
+
+import math
 
 from geometry_msgs.msg import PoseWithCovarianceStamped, TransformStamped
 import rclpy
@@ -12,11 +14,10 @@ from tf2_ros import Buffer, TransformException, TransformListener
 def pose_from_transform(
     transform: TransformStamped,
     covariance,
-    stamp,
 ) -> PoseWithCovarianceStamped:
     """Build a map-frame pose using a TF transform and AMCL covariance."""
     message = PoseWithCovarianceStamped()
-    message.header.stamp = stamp
+    message.header.stamp = transform.header.stamp
     message.header.frame_id = transform.header.frame_id
     message.pose.pose.position.x = transform.transform.translation.x
     message.pose.pose.position.y = transform.transform.translation.y
@@ -24,6 +25,19 @@ def pose_from_transform(
     message.pose.pose.orientation = transform.transform.rotation
     message.pose.covariance = list(covariance)
     return message
+
+
+def source_nanoseconds(stamp):
+    """Reject malformed or unset source times before comparing clock ages."""
+    if stamp is None or stamp.sec < 0 or not 0 <= stamp.nanosec < 1000000000:
+        return None
+    value = stamp.sec * 1000000000 + stamp.nanosec
+    return value if value > 0 else None
+
+
+def valid_covariance(covariance):
+    return (len(covariance) == 36 and all(math.isfinite(v) for v in covariance)
+            and all(covariance[i] >= 0 for i in range(0, 36, 7)))
 
 
 class FleetPoseReporter(Node):
@@ -51,6 +65,7 @@ class FleetPoseReporter(Node):
 
         self.transform_timeout = Duration(seconds=timeout)
         self.latest_covariance = None
+        self.latest_covariance_stamp = None
         self.last_status = ''
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -72,12 +87,31 @@ class FleetPoseReporter(Node):
         )
 
     def _pose_callback(self, message: PoseWithCovarianceStamped) -> None:
+        stamp = source_nanoseconds(message.header.stamp)
+        previous = source_nanoseconds(self.latest_covariance_stamp)
+        if (message.header.frame_id != self.global_frame or stamp is None
+                or stamp > self.get_clock().now().nanoseconds
+                or previous is not None and stamp < previous
+                or not valid_covariance(message.pose.covariance)):
+            self.latest_covariance = self.latest_covariance_stamp = None
+            self._report_status('AMCL_POSE_INVALID')
+            return
         self.latest_covariance = list(message.pose.covariance)
+        self.latest_covariance_stamp = message.header.stamp
 
     def _publish_pose(self) -> None:
         if self.latest_covariance is None:
             self._report_status('WAITING_FOR_AMCL_POSE')
             return
+        now = self.get_clock().now().nanoseconds
+        covariance_stamp = source_nanoseconds(self.latest_covariance_stamp)
+        if (covariance_stamp is None or covariance_stamp > now
+                or not valid_covariance(self.latest_covariance)):
+            self._report_status('AMCL_POSE_INVALID')
+            return
+        # AMCL covariance is the last filter measurement, not a 5 Hz source.
+        # A stationary robot may keep it until motion crosses update_min_*.
+        # Its source time is validated, but no fixed receive lease is imposed.
         try:
             transform = self.tf_buffer.lookup_transform(
                 self.global_frame,
@@ -89,21 +123,16 @@ class FleetPoseReporter(Node):
             self._report_status('LOCALIZATION_TF_UNAVAILABLE')
             return
 
-        transform_stamp = Time.from_msg(transform.header.stamp)
-        transform_age = (
-            self.get_clock().now() - transform_stamp
-        ).nanoseconds / 1e9
-        if transform_stamp.nanoseconds == 0 or (
-            transform_age > self.transform_stale_sec
-        ):
+        now = self.get_clock().now().nanoseconds
+        transform_stamp = source_nanoseconds(transform.header.stamp)
+        if (transform_stamp is None
+                or not 0 <= (now - transform_stamp) / 1e9 <= self.transform_stale_sec):
             self._report_status('LOCALIZATION_TF_STALE')
             return
 
-        now = self.get_clock().now().to_msg()
         message = pose_from_transform(
             transform,
             self.latest_covariance,
-            now,
         )
         self.pose_publisher.publish(message)
         self._report_status('REPORTING')
@@ -125,7 +154,7 @@ class FleetPoseReporter(Node):
 
     def _positive_parameter(self, name: str) -> float:
         value = float(self.get_parameter(name).value)
-        if value <= 0.0:
+        if not math.isfinite(value) or value <= 0.0:
             raise ValueError(f'{name} must be greater than zero')
         return value
 

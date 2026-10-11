@@ -96,7 +96,7 @@
     "clear_s": 0.5,
     "decel": 0.15,
     "latency": 0.2,
-    "crosswalk_stop": false
+    "crosswalk_stop": true
   },
   "crosswalk": {
     "group_gap": 0.2,

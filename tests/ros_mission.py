@@ -79,6 +79,19 @@ class LaneMissionTest(unittest.TestCase):
         server._odom_callback(odom)
         self.assertIsNone(server._exit_status(time.monotonic())['stationary_s'])
 
+    def test_wait_command_source_must_be_valid_before_guard_exemption(self):
+        for offset, speed in [(-2., 0.), (1., 0.), (0., float('nan'))]:
+            with self.subTest(offset=offset, speed=speed):
+                stamp = self.server.get_clock().now().nanoseconds / 1e9 + offset
+                self.server._command_callback(String(data=json.dumps(
+                    dict(reason='obstacle', capture_stamp=stamp, speed=speed, omega=0.))))
+                self.assertEqual(self.server.guard.values['command'], 'invalid_command')
+        stamp = self.server.get_clock().now().nanoseconds / 1e9
+        self.server._command_callback(String(data=json.dumps(
+            dict(reason='obstacle', capture_stamp=stamp, speed=0., omega=0.))))
+        self.assertEqual(self.server.guard.values['command'], 'obstacle')
+        self.assertEqual(self.server.ready_streak, 0)
+
     def tearDown(self):
         self.executor.shutdown()
         self.client.destroy()
